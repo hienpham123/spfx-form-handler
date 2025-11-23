@@ -1,0 +1,28 @@
+/* SPFx Form Handler Styles */
+
+.spfx-form-handler-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.spfx-form-handler-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.spfx-form-handler-error {
+  color: rgb(164, 38, 44);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.spfx-form-handler-required {
+  color: red;
+}
+
+.spfx-form-handler-submit-button {
+  margin-top: 16px;
+}
+

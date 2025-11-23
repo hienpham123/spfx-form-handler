@@ -1,0 +1,77 @@
+{
+  "name": "spfx-form-handler",
+  "version": "1.0.0",
+  "description": "A powerful form handling library for SPFx and React applications with validation, state management, and mock API support. Works seamlessly with both Functional Components and Class Components.",
+  "type": "module",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./styles": "./dist/index.css",
+    "./dist/index.css": "./dist/index.css",
+    "./index.css": "./dist/index.css"
+  },
+  "scripts": {
+    "build": "rollup -c && rm -f dist/css-bundle.js",
+    "dev": "vite",
+    "preview": "vite preview",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "spfx",
+    "sharepoint",
+    "form",
+    "forms",
+    "validation",
+    "form-handler",
+    "fluent-ui",
+    "react",
+    "typescript",
+    "class-component",
+    "functional-component",
+    "mock-api"
+  ],
+  "author": "",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": ">=16.8.0 <20.0.0",
+    "react-dom": ">=16.8.0 <20.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": false
+    },
+    "react-dom": {
+      "optional": false
+    }
+  },
+  "engines": {
+    "node": ">=12.0.0",
+    "npm": ">=6.0.0"
+  },
+  "devDependencies": {
+    "@fluentui/react": "^8.125.1",
+    "@rollup/plugin-commonjs": "^25.0.8",
+    "@rollup/plugin-node-resolve": "^15.3.1",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^11.1.6",
+    "@types/react": "^19.2.6",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.0.0",
+    "postcss-import": "^15.1.0",
+    "rollup": "^4.53.2",
+    "rollup-plugin-dts": "^6.1.0",
+    "rollup-plugin-postcss": "^4.0.2",
+    "typescript": "^5.0.0",
+    "vite": "^4.4.0"
+  }
+}
