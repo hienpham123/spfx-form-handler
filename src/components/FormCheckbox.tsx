@@ -33,12 +33,13 @@ export const FormCheckbox: React.FC<FormCheckboxProps> = ({ name, ...props }) =>
   };
 
   return (
-    <Checkbox
-      {...props}
-      checked={value || false}
-      onChange={handleChange}
-      onBlur={onBlur}
-    />
+    <div onBlur={onBlur}>
+      <Checkbox
+        {...props}
+        checked={value || false}
+        onChange={handleChange}
+      />
+    </div>
   );
 };
 

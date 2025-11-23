@@ -40,8 +40,16 @@
     "functional-component",
     "mock-api"
   ],
-  "author": "",
+  "author": "hienpham123",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hienpham123/spfx-form-handler.git"
+  },
+  "homepage": "https://github.com/hienpham123/spfx-form-handler#readme",
+  "bugs": {
+    "url": "https://github.com/hienpham123/spfx-form-handler/issues"
+  },
   "peerDependencies": {
     "react": ">=16.8.0 <20.0.0",
     "react-dom": ">=16.8.0 <20.0.0"

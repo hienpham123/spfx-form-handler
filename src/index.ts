@@ -40,7 +40,7 @@ export type {
   SharePointFieldMetadata,
   ValidationRule,
   FieldError,
-  FormField,
+  FormFieldConfig,
   FormState,
   FormErrors,
   FormTouched,

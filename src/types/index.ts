@@ -61,7 +61,7 @@ export interface FieldError {
   type: string;
 }
 
-export interface FormField {
+export interface FormFieldConfig {
   name: string;
   label: string;
   type: FieldType;
