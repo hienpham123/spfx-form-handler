@@ -1,6 +1,6 @@
 {
   "name": "spfx-form-handler",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A powerful form handling library for SPFx and React applications with validation, state management, and mock API support. Works seamlessly with both Functional Components and Class Components.",
   "type": "module",
   "main": "dist/cjs/index.js",
