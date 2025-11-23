@@ -383,7 +383,8 @@ const RealWorldApp: React.FC = () => {
         // Chỉ cần truyền endpoint và listName
         id: 0, // 0 = new, > 0 = edit existing
         listName: 'Projects', // ✅ SharePoint list name
-        listUrl: 'https://hieho.sharepoint.com/sites/apps', // ✅ Endpoint
+        listUrl: 'https://hieho.sharepoint.com/sites/apps', // ✅ Web URL hoặc List URL
+        // userServiceUrl: 'https://hieho.sharepoint.com/sites/apps', // Optional: Web URL riêng cho user search (auto-extracted từ listUrl nếu không có)
         
         // Real API service - uncomment và config khi có SPFx context
         apiService: realApiService,

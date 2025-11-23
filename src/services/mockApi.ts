@@ -606,6 +606,92 @@ export class MockApiService {
   }
 
   /**
+   * Search users in SharePoint
+   */
+  async searchUsers(
+    searchText: string,
+    _listUrl?: string
+  ): Promise<ApiResponse<any[]>> {
+    await this.delay();
+
+    if (this.shouldFail()) {
+      return {
+        success: false,
+        error: 'Failed to search users',
+        statusCode: 500,
+      };
+    }
+
+    // Mock users data
+    const allUsers = [
+      {
+        Id: 1,
+        Title: 'John Doe',
+        Email: 'john.doe@example.com',
+        LoginName: 'i:0#.f|membership|john.doe@example.com',
+        PrincipalType: 1, // User
+      },
+      {
+        Id: 2,
+        Title: 'Jane Smith',
+        Email: 'jane.smith@example.com',
+        LoginName: 'i:0#.f|membership|jane.smith@example.com',
+        PrincipalType: 1, // User
+      },
+      {
+        Id: 3,
+        Title: 'Bob Johnson',
+        Email: 'bob.johnson@example.com',
+        LoginName: 'i:0#.f|membership|bob.johnson@example.com',
+        PrincipalType: 1, // User
+      },
+      {
+        Id: 4,
+        Title: 'Alice Williams',
+        Email: 'alice.williams@example.com',
+        LoginName: 'i:0#.f|membership|alice.williams@example.com',
+        PrincipalType: 1, // User
+      },
+      {
+        Id: 5,
+        Title: 'Charlie Brown',
+        Email: 'charlie.brown@example.com',
+        LoginName: 'i:0#.f|membership|charlie.brown@example.com',
+        PrincipalType: 1, // User
+      },
+      {
+        Id: 6,
+        Title: 'IT Department',
+        Email: 'it@example.com',
+        LoginName: 'c:0o.c|federateddirectoryclaimprovider|it-department',
+        PrincipalType: 8, // Security Group
+      },
+      {
+        Id: 7,
+        Title: 'Management Team',
+        Email: 'management@example.com',
+        LoginName: 'c:0o.c|federateddirectoryclaimprovider|management-team',
+        PrincipalType: 8, // Security Group
+      },
+    ];
+
+    // Filter users based on search text
+    const filtered = searchText
+      ? allUsers.filter(
+          (user) =>
+            user.Title.toLowerCase().includes(searchText.toLowerCase()) ||
+            user.Email.toLowerCase().includes(searchText.toLowerCase())
+        )
+      : allUsers;
+
+    return {
+      success: true,
+      data: filtered,
+      statusCode: 200,
+    };
+  }
+
+  /**
    * Update configuration
    */
   updateConfig(config: Partial<MockApiConfig>): void {

@@ -441,3 +441,5 @@ const FunctionalComponentDemo: React.FC = () => {
   );
 };
 
+export default App;
+

@@ -56,7 +56,8 @@ const App: React.FC = () => {
       config={{
         // Chỉ cần truyền endpoint và listName
         listName: 'Projects',
-        listUrl: 'https://hieho.sharepoint.com/sites/apps',
+        listUrl: 'https://hieho.sharepoint.com/sites/apps', // Web URL hoặc List URL (sẽ tự động extract web URL)
+        // userServiceUrl: 'https://hieho.sharepoint.com/sites/apps', // Optional: Web URL riêng cho user search
         id: 0, // 0 = new, > 0 = edit
         autoSave: true, // Auto save to SharePoint
       }}
@@ -244,7 +245,7 @@ Lookup field for SharePoint Lookup columns. Supports both single and multi-selec
 
 ### FormUserPicker
 
-User/People picker field for SharePoint User columns. Supports both single and multi-select with search functionality.
+User/People picker field for SharePoint User columns. Supports both single and multi-select with search functionality. Automatically loads users from SharePoint when `listUrl` or `userServiceUrl` is provided.
 
 ```tsx
 // Single select user picker
@@ -261,6 +262,20 @@ User/People picker field for SharePoint User columns. Supports both single and m
   multiSelect
   allowGroups // Allow selecting groups in addition to users
 />
+```
+
+**Note:** `FormUserPicker` requires a web URL (not list URL) to search users. The library automatically extracts the web URL from `listUrl` if it's a list URL, or you can provide `userServiceUrl` explicitly:
+
+```tsx
+<FormProvider
+  config={{
+    listName: 'Projects',
+    listUrl: 'https://hieho.sharepoint.com/sites/apps/Lists/Projects', // List URL
+    userServiceUrl: 'https://hieho.sharepoint.com/sites/apps', // Web URL for user search (optional, auto-extracted from listUrl)
+  }}
+>
+  <FormUserPicker name="assignedTo" />
+</FormProvider>
 ```
 
 ### FormAttachmentPicker
@@ -786,6 +801,7 @@ form.itemData        // Loaded item data
 form.itemId          // Current item ID
 form.listName        // SharePoint list name
 form.listUrl         // SharePoint list URL
+form.userServiceUrl  // SharePoint web URL for user search
 
 // Form methods
 form.setValue(name, value)        // Set field value
@@ -892,7 +908,8 @@ const apiService = {
   config={{
     id: 1, // 0 = new, > 0 = edit
     listName: 'Projects', // ✅ SharePoint list name
-    listUrl: 'https://hieho.sharepoint.com/sites/apps', // ✅ Endpoint
+    listUrl: 'https://hieho.sharepoint.com/sites/apps', // ✅ Web URL hoặc List URL
+    // userServiceUrl: 'https://hieho.sharepoint.com/sites/apps', // Optional: Web URL riêng cho user search (auto-extracted từ listUrl nếu không có)
     apiService: apiService,
     autoSave: true, // Auto save to SharePoint
   }}
@@ -902,7 +919,7 @@ const apiService = {
   <FormField fieldName="Category" />
   <FormField fieldName="Status" />
   <FormField fieldName="StartDate" />
-  <FormField fieldName="AssignedTo" />
+  <FormField fieldName="AssignedTo" /> {/* FormUserPicker sẽ tự động lấy users từ SharePoint */}
 </FormProvider>
 ```
 
@@ -957,7 +974,8 @@ Use `onBeforeSave` to transform data before saving:
 <FormProvider
   config={{
     listName: 'Projects',
-    listUrl: 'https://hieho.sharepoint.com/sites/apps',
+    listUrl: 'https://hieho.sharepoint.com/sites/apps', // Web URL hoặc List URL
+    // userServiceUrl: 'https://hieho.sharepoint.com/sites/apps', // Optional: Web URL riêng cho user search
     onBeforeSave: (values) => {
       // Transform data before saving
       return {
@@ -984,7 +1002,8 @@ Use `onValidSave` to add custom validation logic before saving:
 <FormProvider
   config={{
     listName: 'Projects',
-    listUrl: 'https://hieho.sharepoint.com/sites/apps',
+    listUrl: 'https://hieho.sharepoint.com/sites/apps', // Web URL hoặc List URL
+    // userServiceUrl: 'https://hieho.sharepoint.com/sites/apps', // Optional: Web URL riêng cho user search
     onValidSave: (form) => {
       // Custom validation logic
       // Return true to allow save, false to prevent save
@@ -1017,6 +1036,47 @@ Use `onValidSave` to add custom validation logic before saving:
   {/* Your form */}
 </FormProvider>
 ```
+
+## User Service URL Configuration
+
+When using `FormUserPicker`, the library needs a web URL (not list URL) to search for users. The library automatically extracts the web URL from `listUrl` if it's a list URL, or you can provide `userServiceUrl` explicitly:
+
+### Automatic Extraction
+
+If `listUrl` is a list URL (contains `/Lists/`), the library automatically extracts the web URL:
+
+```tsx
+<FormProvider
+  config={{
+    listName: 'Projects',
+    listUrl: 'https://hieho.sharepoint.com/sites/apps/Lists/Projects', // List URL
+    // userServiceUrl will be automatically extracted to: https://hieho.sharepoint.com/sites/apps
+  }}
+>
+  <FormUserPicker name="assignedTo" /> {/* Uses extracted web URL */}
+</FormProvider>
+```
+
+### Explicit userServiceUrl
+
+You can also provide `userServiceUrl` explicitly:
+
+```tsx
+<FormProvider
+  config={{
+    listName: 'Projects',
+    listUrl: 'https://hieho.sharepoint.com/sites/apps/Lists/Projects', // List URL for list operations
+    userServiceUrl: 'https://hieho.sharepoint.com/sites/apps', // Web URL for user search
+  }}
+>
+  <FormUserPicker name="assignedTo" /> {/* Uses userServiceUrl */}
+</FormProvider>
+```
+
+**Note:** 
+- `listUrl` is used for list operations (getItem, addItem, updateItem, etc.)
+- `userServiceUrl` is used for user search operations (FormUserPicker)
+- If `userServiceUrl` is not provided, it's automatically extracted from `listUrl`
 
 ## Multiple Forms
 

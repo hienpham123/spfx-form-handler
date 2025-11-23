@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { 
   NormalPeoplePicker,
   IPersonaProps,
@@ -63,6 +63,7 @@ export const FormUserPicker: React.FC<FormUserPickerProps> = ({
 }) => {
   const { value, error, touched, onChange, onBlur } = useField(name);
   const formContext = useFormContext();
+  const [users, setUsers] = useState<UserInfo[]>([]);
 
   // Check if custom render is provided
   const customRender = formContext.renderCustomField(name);
@@ -70,7 +71,12 @@ export const FormUserPicker: React.FC<FormUserPickerProps> = ({
     return <>{customRender}</>;
   }
 
-  // Mock users data with avatar URLs - in real SPFx, this would come from SharePoint
+  // Get API service from form context
+  const apiService = formContext.apiService;
+  // Use userServiceUrl for user search (web URL), fallback to listUrl if not provided
+  const userServiceUrl = formContext.userServiceUrl || formContext.listUrl;
+
+  // Mock users data with avatar URLs - fallback if no API service
   const mockUsers = useMemo<UserInfo[]>(() => [
     {
       id: '1',
@@ -129,6 +135,81 @@ export const FormUserPicker: React.FC<FormUserPickerProps> = ({
     ] : []
   , [allowGroups]);
 
+  // Convert SharePoint user data to UserInfo
+  const convertSharePointUser = (spUser: any): UserInfo => {
+    const userId = String(spUser.Id || spUser.id || spUser.Id);
+    const title = spUser.Title || spUser.title || spUser.Name || '';
+    const email = spUser.Email || spUser.email || '';
+    const loginName = spUser.LoginName || spUser.loginName || spUser.PrincipalName || '';
+    
+    // Generate avatar URL if not provided
+    const imageUrl = spUser.PictureUrl || spUser.pictureUrl || 
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(title)}&background=0078d4&color=fff&size=128`;
+
+    return {
+      id: userId,
+      title,
+      email,
+      loginName,
+      imageUrl,
+    };
+  };
+
+  // Search users from SharePoint API
+  const searchUsersFromApi = useCallback(async (searchText: string): Promise<UserInfo[]> => {
+    // If custom searchUsers function provided, use it
+    if (searchUsers) {
+      return await searchUsers(searchText);
+    }
+
+    // If apiService has searchUsers method, use it
+    if (apiService && 'searchUsers' in apiService && typeof apiService.searchUsers === 'function') {
+      try {
+        // Use userServiceUrl (web URL) for user search, not listUrl
+        const response = await apiService.searchUsers(searchText, userServiceUrl);
+        if (response.success && response.data) {
+          const userInfos = response.data
+            .filter((user: any) => {
+              // Filter by allowGroups
+              if (!allowGroups) {
+                // Only return users (PrincipalType === 1), not groups
+                return (user.PrincipalType || user.principalType || 1) === 1;
+              }
+              return true;
+            })
+            .map(convertSharePointUser);
+          
+          // Cache users if search text is empty (initial load)
+          if (!searchText && userInfos.length > 0) {
+            setUsers(userInfos);
+          }
+          
+          return userInfos;
+        }
+      } catch (error) {
+        console.error('Error searching users:', error);
+      }
+    }
+
+    // Fallback to mock data
+    const allItems = [...mockUsers, ...mockGroups];
+    if (searchText) {
+      return allItems.filter(
+        (user) =>
+          user.title.toLowerCase().includes(searchText.toLowerCase()) ||
+          user.email.toLowerCase().includes(searchText.toLowerCase())
+      );
+    }
+    return allItems;
+  }, [apiService, userServiceUrl, searchUsers, allowGroups, mockUsers, mockGroups]);
+
+  // Use API users if available, otherwise use mock
+  const allUsers = users.length > 0 ? users : mockUsers;
+  const allGroups = allowGroups ? (users.length > 0 ? users.filter((u) => {
+    // In real API, we'd check PrincipalType, but for mock we check id prefix
+    return u.id.startsWith('g');
+  }) : mockGroups) : [];
+
   // Convert UserInfo to IPersonaProps for NormalPeoplePicker
   const convertToPersona = (user: UserInfo): IPersonaProps => ({
     id: user.id,
@@ -145,34 +226,33 @@ export const FormUserPicker: React.FC<FormUserPickerProps> = ({
 
   // Get selected personas
   const selectedPersonas = useMemo<IPersonaProps[]>(() => {
-    const allItems = [...mockUsers, ...mockGroups];
+    const allItems = [...allUsers, ...allGroups];
     if (multiSelect) {
       const selectedIds = Array.isArray(value) ? value : [];
       return allItems
         .filter((u) => selectedIds.includes(u.id))
         .map(convertToPersona);
     } else {
-      const selectedUser = allItems.find((u) => u.id === value);
+      const selectedUser = allItems.find((u) => u.id === String(value));
       return selectedUser ? [convertToPersona(selectedUser)] : [];
     }
-  }, [value, multiSelect, mockUsers, mockGroups]);
+  }, [value, multiSelect, allUsers, allGroups]);
 
-  // Resolve suggestions for search
-  const onResolveSuggestions = (filterText: string, currentPersonas?: IPersonaProps[]): IPersonaProps[] => {
+  // Resolve suggestions for search - async version
+  const onResolveSuggestions = async (
+    filterText: string, 
+    currentPersonas?: IPersonaProps[]
+  ): Promise<IPersonaProps[]> => {
     if (!filterText) {
       return [];
     }
 
-    const allItems = [...mockUsers, ...mockGroups];
-    const filtered = allItems.filter(
-      (user) =>
-        user.title.toLowerCase().includes(filterText.toLowerCase()) ||
-        user.email.toLowerCase().includes(filterText.toLowerCase())
-    );
+    // Search users from API
+    const foundUsers = await searchUsersFromApi(filterText);
 
     // Exclude already selected items
     const currentIds = currentPersonas?.map((p) => p.id) || [];
-    const available = filtered.filter((u) => !currentIds.includes(u.id));
+    const available = foundUsers.filter((u) => !currentIds.includes(u.id));
 
     return available.map(convertToPersona);
   };
@@ -212,11 +292,12 @@ export const FormUserPicker: React.FC<FormUserPickerProps> = ({
       )}
       <NormalPeoplePicker
         onResolveSuggestions={onResolveSuggestions}
-        onEmptyInputFocus={(currentPersonas?: IPersonaProps[]) => {
+        onEmptyInputFocus={async (currentPersonas?: IPersonaProps[]) => {
           // Show all available users when input is empty
-          const allItems = [...mockUsers, ...mockGroups];
+          // Try to load from API first, then fallback to mock
+          const foundUsers = await searchUsersFromApi('');
           const currentIds = currentPersonas?.map((p) => p.id) || [];
-          const available = allItems
+          const available = foundUsers
             .filter((u) => !currentIds.includes(u.id))
             .map(convertToPersona);
           return available;

@@ -110,7 +110,8 @@ export interface FormConfig {
   // SharePoint list configuration - direct props
   id?: number; // Item ID (0 or undefined = new item, > 0 = edit existing)
   listName?: string; // SharePoint list name
-  listUrl?: string; // SharePoint list URL (optional)
+  listUrl?: string; // SharePoint list URL (optional) - can be list URL or web URL
+  userServiceUrl?: string; // SharePoint web URL for user search (optional, defaults to extracted web URL from listUrl)
   fieldMapping?: Record<string, string>; // Map SharePoint field names to form field names (bidirectional)
   autoSave?: boolean; // Auto save to SharePoint on submit (default: true if listName is provided)
   apiService?: {
@@ -122,6 +123,7 @@ export interface FormConfig {
     deleteFile?: (listName: string, itemId: number, fileName: string, listUrl?: string) => Promise<ApiResponse<any>>; // Optional: for deleting attachments
     getFieldMetadata?: (listName: string, fieldName: string, listUrl?: string) => Promise<ApiResponse<SharePointFieldMetadata>>; // Optional: for getting field metadata
     getListFields?: (listName: string, listUrl?: string) => Promise<ApiResponse<SharePointFieldMetadata[]>>; // Optional: for getting all list fields
+    searchUsers?: (searchText: string, listUrl?: string) => Promise<ApiResponse<any[]>>; // Optional: for searching users in SharePoint
   }; // Custom API service, defaults to mockApi
   // Legacy listConfig (deprecated, use id/listName/listUrl directly)
   listConfig?: SharePointListConfig;
@@ -156,6 +158,7 @@ export interface UseFormReturn {
   itemId?: number; // Current item ID (0 or undefined means new item)
   listName?: string; // SharePoint list name
   listUrl?: string; // SharePoint list URL
+  userServiceUrl?: string; // SharePoint web URL for user search
   setValue: (name: string, value: any) => void;
   getValue: (name: string) => any; // Get value by field name
   setError: (name: string, error: FieldError | null) => void;

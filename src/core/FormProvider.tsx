@@ -14,6 +14,7 @@ interface FormContextValue extends UseFormReturn {
     deleteFile?: (listName: string, itemId: number, fileName: string, listUrl?: string) => Promise<any>;
     getFieldMetadata?: (listName: string, fieldName: string, listUrl?: string) => Promise<any>;
     getListFields?: (listName: string, listUrl?: string) => Promise<any>;
+    searchUsers?: (searchText: string, listUrl?: string) => Promise<any>;
   };
   renderCustomField: (name: string) => React.ReactNode | null; // Function to render custom field
 }
@@ -43,10 +44,30 @@ export const FormProvider: React.FC<FormProviderProps> = ({ children, config }) 
   const [isLoading, setIsLoading] = useState(false);
   const [itemData, setItemData] = useState<any>(null);
 
+  // Helper function to extract web URL from list URL
+  const extractWebUrl = (url?: string): string | undefined => {
+    if (!url) return undefined;
+    
+    // If URL contains '/Lists/' or '/lists/', extract web URL
+    const listsMatch = url.match(/^(.+?)\/(?:Lists|lists)\//i);
+    if (listsMatch) {
+      return listsMatch[1];
+    }
+    
+    // If URL is already a web URL (contains '/sites/' or '/teams/' or root), return as is
+    if (url.match(/\/sites\/|\/teams\/|^https?:\/\/[^\/]+$/i)) {
+      return url;
+    }
+    
+    // Default: return as is (assume it's a web URL)
+    return url;
+  };
+
   // Get id, listName, listUrl from config (direct props or from listConfig for backward compatibility)
   const itemId = config.id !== undefined ? config.id : config.listConfig?.itemId;
   const listName = config.listName || config.listConfig?.listName;
   const listUrl = config.listUrl || config.listConfig?.listUrl;
+  const userServiceUrl = config.userServiceUrl || extractWebUrl(listUrl); // Use userServiceUrl if provided, otherwise extract from listUrl
   const fieldMapping = config.fieldMapping || config.listConfig?.fieldMapping || {};
   const autoSave = config.autoSave !== false && listName ? true : false; // Default to true if listName is provided
   
@@ -93,6 +114,11 @@ export const FormProvider: React.FC<FormProviderProps> = ({ children, config }) 
       : async (listName: string, listUrl?: string) => {
           return await mockApi.getListFields(listName, listUrl);
         }) as (listName: string, listUrl?: string) => Promise<any>,
+    searchUsers: (customApiService && 'searchUsers' in customApiService && customApiService.searchUsers
+      ? customApiService.searchUsers
+      : async (searchText: string, listUrl?: string) => {
+          return await mockApi.searchUsers(searchText, listUrl);
+        }) as (searchText: string, listUrl?: string) => Promise<any>,
   };
 
   // Load item data from SharePoint if id is provided and > 0
@@ -511,6 +537,7 @@ export const FormProvider: React.FC<FormProviderProps> = ({ children, config }) 
     itemId: itemId && itemId > 0 ? itemId : undefined,
     listName,
     listUrl,
+    userServiceUrl, // Expose userServiceUrl for user search
     setValue,
     getValue,
     setError,

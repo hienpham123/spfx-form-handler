@@ -309,6 +309,141 @@ export const createSpfxApiService = () => {
         };
       }
     },
+
+    searchUsers: async (searchText: string, listUrl?: string): Promise<ApiResponse<any[]>> => {
+      try {
+        const web = listUrl 
+          ? sp.web.getUrl() !== listUrl ? sp.site.openWeb(listUrl) : sp.web
+          : sp.web;
+
+        // Search for users using SharePoint siteUsers
+        const users = await web.siteUsers
+          .filter(`substringof('${searchText}', Title) or substringof('${searchText}', Email)`)
+          .top(20)
+          .select('Id', 'Title', 'Email', 'LoginName', 'PrincipalType')
+          .get();
+
+        // Get profile pictures for each user
+        const userResults = await Promise.all(
+          users.map(async (user: any) => {
+            let pictureUrl: string | undefined;
+            
+            try {
+              // Try to get profile picture from User Profile Service
+              // Format: /_api/SP.UserProfiles.PeopleManager/GetPropertiesFor(accountName=@v)?@v='i:0#.f|membership|user@domain.com'
+              const loginName = user.LoginName || user.Email;
+              if (loginName) {
+                try {
+                  // Method 1: Try User Profile Service (more reliable for profile pictures)
+                  const profileUrl = `${web.url}/_api/SP.UserProfiles.PeopleManager/GetPropertiesFor(accountName=@v)?@v='${encodeURIComponent(loginName)}'`;
+                  const profileResponse = await fetch(profileUrl, {
+                    method: 'GET',
+                    headers: {
+                      'Accept': 'application/json;odata=nometadata',
+                    },
+                    credentials: 'include',
+                  });
+                  
+                  if (profileResponse.ok) {
+                    const profileData = await profileResponse.json();
+                    // Find PictureURL property
+                    const pictureProperty = profileData.UserProfileProperties?.find(
+                      (prop: any) => prop.Key === 'PictureURL' || prop.Key === 'SPS-PicturePlaceholder-State'
+                    );
+                    if (pictureProperty?.Value) {
+                      pictureUrl = pictureProperty.Value;
+                    }
+                  }
+                } catch (profileError) {
+                  // If User Profile Service fails, try alternative method
+                  console.warn('Failed to get profile picture from User Profile Service:', profileError);
+                }
+
+                // Method 2: Fallback - Use SharePoint's built-in user photo endpoint
+                if (!pictureUrl) {
+                  // SharePoint user photo endpoint format: /_layouts/15/userphoto.aspx?size=S&accountname=user@domain.com
+                  // Or: /_api/SP.UserProfiles.PeopleManager/GetUserProfilePropertyFor(accountName=@v,propertyName='PictureURL')?@v='user@domain.com'
+                  try {
+                    const photoUrl = `${web.url}/_layouts/15/userphoto.aspx?size=M&accountname=${encodeURIComponent(loginName)}`;
+                    // Test if image exists by making a HEAD request
+                    const photoTest = await fetch(photoUrl, { method: 'HEAD', credentials: 'include' });
+                    if (photoTest.ok) {
+                      pictureUrl = photoUrl;
+                    }
+                  } catch (photoError) {
+                    // Ignore photo error
+                  }
+                }
+              }
+            } catch (picError) {
+              // If getting picture fails, continue without it
+              console.warn('Failed to get user picture:', picError);
+            }
+
+            return {
+              Id: user.Id,
+              Title: user.Title,
+              Email: user.Email,
+              LoginName: user.LoginName,
+              PrincipalType: user.PrincipalType || 1,
+              PictureUrl: pictureUrl, // Add picture URL if found
+            };
+          })
+        );
+
+        return {
+          success: true,
+          data: userResults,
+          statusCode: 200,
+        };
+      } catch (error: any) {
+        // Fallback: try using ensureUser for exact matches
+        try {
+          if (searchText.includes('@')) {
+            const user = await sp.web.ensureUser(searchText);
+            let pictureUrl: string | undefined;
+            
+            // Try to get profile picture for single user
+            try {
+              const loginName = user.data.LoginName || user.data.Email;
+              if (loginName) {
+                const web = listUrl 
+                  ? sp.web.getUrl() !== listUrl ? sp.site.openWeb(listUrl) : sp.web
+                  : sp.web;
+                const photoUrl = `${web.url}/_layouts/15/userphoto.aspx?size=M&accountname=${encodeURIComponent(loginName)}`;
+                const photoTest = await fetch(photoUrl, { method: 'HEAD', credentials: 'include' });
+                if (photoTest.ok) {
+                  pictureUrl = photoUrl;
+                }
+              }
+            } catch (picError) {
+              // Ignore
+            }
+
+            return {
+              success: true,
+              data: [{
+                Id: user.data.Id,
+                Title: user.data.Title,
+                Email: user.data.Email,
+                LoginName: user.data.LoginName,
+                PrincipalType: user.data.PrincipalType || 1,
+                PictureUrl: pictureUrl,
+              }],
+              statusCode: 200,
+            };
+          }
+        } catch (e) {
+          // Ignore fallback error
+        }
+
+        return {
+          success: false,
+          error: error.message || 'Failed to search users',
+          statusCode: error.status || 500,
+        };
+      }
+    },
   };
 };
 
@@ -691,6 +826,100 @@ export const createSpfxRestApiService = (context?: any) => {
           success: false,
           error: error.message || 'Failed to delete file',
           statusCode: 500,
+        };
+      }
+    },
+
+    searchUsers: async (searchText: string, listUrl?: string): Promise<ApiResponse<any[]>> => {
+      try {
+        const webUrl = getWebUrl(listUrl);
+        
+        // Search users using SharePoint REST API
+        // Method 1: Use siteUsers endpoint
+        const apiUrl = `${webUrl}/_api/web/siteusers?$filter=substringof('${encodeURIComponent(searchText)}', Title) or substringof('${encodeURIComponent(searchText)}', Email)&$top=20&$select=Id,Title,Email,LoginName,PrincipalType`;
+        
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: getHeaders(),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        const users = data.d?.results || data.value || [];
+
+        // Get profile pictures for each user
+        const userResults = await Promise.all(
+          users.map(async (user: any) => {
+            let pictureUrl: string | undefined;
+            
+            try {
+              const loginName = user.LoginName || user.Email;
+              if (loginName) {
+                // Try User Profile Service for profile picture
+                try {
+                  const profileUrl = `${webUrl}/_api/SP.UserProfiles.PeopleManager/GetPropertiesFor(accountName=@v)?@v='${encodeURIComponent(loginName)}'`;
+                  const profileResponse = await fetch(profileUrl, {
+                    method: 'GET',
+                    headers: {
+                      'Accept': 'application/json;odata=nometadata',
+                    },
+                    credentials: 'include',
+                  });
+                  
+                  if (profileResponse.ok) {
+                    const profileData = await profileResponse.json();
+                    const pictureProperty = profileData.UserProfileProperties?.find(
+                      (prop: any) => prop.Key === 'PictureURL' || prop.Key === 'SPS-PicturePlaceholder-State'
+                    );
+                    if (pictureProperty?.Value) {
+                      pictureUrl = pictureProperty.Value;
+                    }
+                  }
+                } catch (profileError) {
+                  // Ignore profile service error
+                }
+
+                // Fallback: Use SharePoint's built-in user photo endpoint
+                if (!pictureUrl) {
+                  try {
+                    const photoUrl = `${webUrl}/_layouts/15/userphoto.aspx?size=M&accountname=${encodeURIComponent(loginName)}`;
+                    const photoTest = await fetch(photoUrl, { method: 'HEAD', credentials: 'include' });
+                    if (photoTest.ok) {
+                      pictureUrl = photoUrl;
+                    }
+                  } catch (photoError) {
+                    // Ignore photo error
+                  }
+                }
+              }
+            } catch (picError) {
+              // Continue without picture
+            }
+
+            return {
+              Id: user.Id,
+              Title: user.Title,
+              Email: user.Email,
+              LoginName: user.LoginName,
+              PrincipalType: user.PrincipalType || 1,
+              PictureUrl: pictureUrl,
+            };
+          })
+        );
+
+        return {
+          success: true,
+          data: userResults,
+          statusCode: 200,
+        };
+      } catch (error: any) {
+        return {
+          success: false,
+          error: error.message || 'Failed to search users',
+          statusCode: error.status || 500,
         };
       }
     },

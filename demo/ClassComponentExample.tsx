@@ -366,7 +366,8 @@ class ClassComponentApp extends React.Component {
               config={{
                 id: projectId,
                 listName: 'Projects',
-                listUrl: 'https://hieho.sharepoint.com/sites/apps',
+                listUrl: 'https://hieho.sharepoint.com/sites/apps', // Web URL hoặc List URL
+                // userServiceUrl: 'https://hieho.sharepoint.com/sites/apps', // Optional: Web URL riêng cho user search
                 autoSave: true,
                 validationSchema: {
                   Title: {
