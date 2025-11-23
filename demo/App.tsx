@@ -12,7 +12,8 @@ import {
   FormAttachmentPicker,
   mockApi,
 } from '../src';
-import { PrimaryButton, Stack, MessageBar, MessageBarType, Spinner, Toggle, Text } from '@fluentui/react';
+import { PrimaryButton, Stack, MessageBar, MessageBarType, Spinner, Toggle, Text, Pivot, PivotItem } from '@fluentui/react';
+import ClassComponentExample from './ClassComponentExample';
 
 interface DemoFormProps {
   onSubmit: (values: any) => Promise<void>;
@@ -258,6 +259,26 @@ const DemoForm: React.FC<DemoFormProps> = ({ onSubmit }) => {
 };
 
 const App: React.FC = () => {
+  const [selectedTab, setSelectedTab] = useState<string>('functional');
+
+  return (
+    <div style={{ padding: 20 }}>
+      <Pivot
+        selectedKey={selectedTab}
+        onLinkClick={(item) => item && setSelectedTab(item.props.itemKey || 'functional')}
+      >
+        <PivotItem headerText="Functional Components" itemKey="functional">
+          <FunctionalComponentDemo />
+        </PivotItem>
+        <PivotItem headerText="Class Components" itemKey="class">
+          <ClassComponentExample />
+        </PivotItem>
+      </Pivot>
+    </div>
+  );
+};
+
+const FunctionalComponentDemo: React.FC = () => {
   const [useListConfig, setUseListConfig] = useState(true);
   const [itemId, setItemId] = useState(1);
 
@@ -271,7 +292,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: 20 }}>
+    <div>
       <div style={{ maxWidth: 600, margin: '0 auto 20px', padding: 16, backgroundColor: '#f3f2f1', borderRadius: 4 }}>
         <h3>Configuration</h3>
         <Stack tokens={{ childrenGap: 12 }}>
@@ -419,6 +440,4 @@ const App: React.FC = () => {
     </div>
   );
 };
-
-export default App;
 

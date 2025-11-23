@@ -510,43 +510,298 @@ const { value, error, touched, onChange, onBlur } = useField('email');
 
 ## Class Component Support
 
-### Using withForm HOC
+The library provides two ways to use form context in class components:
+
+### Method 1: Using withForm HOC (Recommended)
+
+Wrap your class component with `withForm` HOC to inject form context as props.
 
 ```tsx
-import { withForm, WithFormProps } from 'spfx-form-handler';
+import React from 'react';
+import { 
+  FormProvider, 
+  withForm, 
+  WithFormProps,
+  FormTextField,
+  FormDropdown,
+  PrimaryButton 
+} from 'spfx-form-handler';
 
-class MyFormComponent extends React.Component<WithFormProps> {
+interface MyFormProps extends WithFormProps {
+  title?: string;
+}
+
+class MyFormComponent extends React.Component<MyFormProps> {
   render() {
-    const { form } = this.props;
+    const { form, title = 'My Form' } = this.props;
     
     return (
       <form onSubmit={form.handleSubmit}>
-        <input
-          value={form.values.name || ''}
-          onChange={(e) => form.handleChange('name', e.target.value)}
+        <h2>{title}</h2>
+        
+        <FormTextField
+          name="title"
+          label="Title"
+          required
         />
-        <button type="submit">Submit</button>
+        
+        <FormTextField
+          name="email"
+          label="Email"
+          type="email"
+          required
+        />
+        
+        <FormDropdown
+          name="status"
+          label="Status"
+          options={[
+            { key: 'active', text: 'Active' },
+            { key: 'inactive', text: 'Inactive' }
+          ]}
+          required
+        />
+        
+        <PrimaryButton
+          type="submit"
+          text="Submit"
+          disabled={form.isSubmitting || !form.isValid}
+        />
+        
+        <button type="button" onClick={() => form.reset()}>
+          Reset
+        </button>
       </form>
     );
   }
 }
 
-export default withForm(MyFormComponent);
+// Wrap component with withForm HOC
+const MyForm = withForm(MyFormComponent);
+
+// Use in your app
+const App = () => {
+  return (
+    <FormProvider
+      config={{
+        initialValues: {
+          title: '',
+          email: '',
+          status: undefined,
+        },
+        validationSchema: {
+          title: { required: true, minLength: 3 },
+          email: { required: true, email: true },
+          status: { required: true },
+        },
+        onSubmit: async (values) => {
+          console.log('Submitted:', values);
+        },
+      }}
+    >
+      <MyForm title="User Registration" />
+    </FormProvider>
+  );
+};
 ```
 
-### Using FormConsumer
+### Method 2: Using FormConsumer (Render Props Pattern)
+
+Use `FormConsumer` component for render props pattern.
 
 ```tsx
-import { FormConsumer } from 'spfx-form-handler';
+import React from 'react';
+import { 
+  FormProvider, 
+  FormConsumer,
+  FormTextField,
+  PrimaryButton 
+} from 'spfx-form-handler';
 
-<FormConsumer>
-  {(form) => (
-    <form onSubmit={form.handleSubmit}>
-      {/* Your form fields */}
-    </form>
-  )}
-</FormConsumer>
+class MyFormComponent extends React.Component {
+  render() {
+    return (
+      <FormConsumer>
+        {(form) => (
+          <form onSubmit={form.handleSubmit}>
+            <FormTextField
+              name="name"
+              label="Name"
+              required
+            />
+            
+            <PrimaryButton
+              type="submit"
+              text="Submit"
+              disabled={form.isSubmitting}
+            />
+            
+            <div>
+              <p>Is Valid: {form.isValid ? 'Yes' : 'No'}</p>
+              <p>Is Submitting: {form.isSubmitting ? 'Yes' : 'No'}</p>
+            </div>
+          </form>
+        )}
+      </FormConsumer>
+    );
+  }
+}
+
+const App = () => {
+  return (
+    <FormProvider
+      config={{
+        initialValues: { name: '' },
+        validationSchema: {
+          name: { required: true },
+        },
+        onSubmit: async (values) => {
+          console.log('Submitted:', values);
+        },
+      }}
+    >
+      <MyFormComponent />
+    </FormProvider>
+  );
+};
 ```
+
+### Using with SharePoint List (FormField)
+
+You can use `withForm` HOC with SharePoint lists and `FormField` component:
+
+```tsx
+import React from 'react';
+import { 
+  FormProvider, 
+  withForm, 
+  WithFormProps,
+  FormField,
+  PrimaryButton 
+} from 'spfx-form-handler';
+
+interface ProjectFormProps extends WithFormProps {
+  projectId?: number;
+}
+
+class ProjectFormComponent extends React.Component<ProjectFormProps> {
+  componentDidMount() {
+    const { form, projectId } = this.props;
+    
+    // Reload data if projectId is provided
+    if (projectId && projectId > 0) {
+      form.reloadItemData();
+    }
+  }
+
+  componentDidUpdate(prevProps: ProjectFormProps) {
+    const { form, projectId } = this.props;
+    
+    // Reload when projectId changes
+    if (projectId !== prevProps.projectId && projectId && projectId > 0) {
+      form.reloadItemData();
+    }
+  }
+
+  render() {
+    const { form, projectId } = this.props;
+
+    if (form.isLoading) {
+      return <div>Loading...</div>;
+    }
+
+    return (
+      <form onSubmit={form.handleSubmit}>
+        {/* FormField automatically detects field type */}
+        <FormField fieldName="Title" />
+        <FormField fieldName="StartDate" />
+        <FormField fieldName="Status" />
+        <FormField fieldName="AssignedTo" />
+        
+        <PrimaryButton
+          type="submit"
+          text={projectId ? "Update" : "Create"}
+          disabled={form.isSubmitting || !form.isValid}
+        />
+        
+        {projectId && (
+          <button 
+            type="button" 
+            onClick={() => form.reloadItemData()}
+          >
+            Reload Data
+          </button>
+        )}
+      </form>
+    );
+  }
+}
+
+const ProjectForm = withForm(ProjectFormComponent);
+
+const App = () => {
+  return (
+    <FormProvider
+      config={{
+        id: 1, // 0 = new, > 0 = edit
+        listName: 'Projects',
+        listUrl: 'https://hieho.sharepoint.com/sites/apps',
+        autoSave: true,
+        onBeforeSave: (values) => {
+          // Transform data before saving
+          return {
+            ...values,
+            StartDate: values.StartDate ? new Date(values.StartDate).toISOString() : null,
+          };
+        },
+        onValidSave: (form) => {
+          // Custom validation
+          if (!form.isValid) return false;
+          // Add your business rules here
+          return true;
+        },
+      }}
+    >
+      <ProjectForm projectId={1} />
+    </FormProvider>
+  );
+};
+```
+
+### Available Form Methods in Class Components
+
+When using `withForm` HOC or `FormConsumer`, you have access to all form methods:
+
+```tsx
+const { form } = this.props; // or from FormConsumer
+
+// Form state
+form.values          // Current form values
+form.errors          // Form errors
+form.touched         // Touched fields
+form.isValid         // Is form valid
+form.isSubmitting    // Is form submitting
+form.isLoading       // Is loading data
+form.itemData        // Loaded item data
+form.itemId          // Current item ID
+form.listName        // SharePoint list name
+form.listUrl         // SharePoint list URL
+
+// Form methods
+form.setValue(name, value)        // Set field value
+form.getValue(name)               // Get field value
+form.setError(name, error)        // Set field error
+form.handleChange(name, value)    // Handle field change
+form.handleBlur(name)              // Handle field blur
+form.handleSubmit(e)              // Handle form submit
+form.reset()                       // Reset form
+form.resetField(name)              // Reset specific field
+form.validate()                    // Validate form
+form.validateField(name)           // Validate specific field
+form.reloadItemData()              // Reload item data from SharePoint
+```
+
+See `demo/ClassComponentExample.tsx` for complete examples.
 
 ## FormProvider Configuration
 
