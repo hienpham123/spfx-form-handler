@@ -10,7 +10,6 @@ import { FormMultiChoice } from './FormMultiChoice';
 import { FormLookup } from './FormLookup';
 import { FormUserPicker } from './FormUserPicker';
 import { FormAttachmentPicker } from './FormAttachmentPicker';
-import { mockApi } from '../services/mockApi';
 
 export interface FormFieldProps {
   fieldName: string; // SharePoint Internal Field Name
@@ -67,6 +66,12 @@ export const FormField: React.FC<FormFieldProps> = ({
   // Cache key
   const cacheKey = `${listName || 'default'}_${listUrl || 'default'}_${fieldName}`;
 
+  useEffect(() => {
+    if (formContext.registerField && fieldName) {
+      formContext.registerField(fieldName);
+    }
+  }, [fieldName, formContext.registerField]);
+
   // Load field metadata
   useEffect(() => {
     // Check cache first
@@ -88,15 +93,11 @@ export const FormField: React.FC<FormFieldProps> = ({
       setLoadError(null);
 
       try {
-        let response;
-
-        if (apiService && 'getFieldMetadata' in apiService && typeof apiService.getFieldMetadata === 'function') {
-          // Use custom getFieldMetadata method
-          response = await (apiService.getFieldMetadata as (listName: string, fieldName: string, listUrl?: string) => Promise<any>)(listName, fieldName, listUrl);
-        } else {
-          // Fallback to mock API
-          response = await mockApi.getFieldMetadata(listName, fieldName, listUrl);
+        if (!apiService || !('getFieldMetadata' in apiService) || typeof apiService.getFieldMetadata !== 'function') {
+          throw new Error('getFieldMetadata method is not available in API service. Please provide a valid API service with listUrl.');
         }
+
+        const response = await (apiService.getFieldMetadata as (listName: string, fieldName: string, listUrl?: string) => Promise<any>)(listName, fieldName, listUrl);
 
         if (response.success && response.data) {
           const metadata = response.data as SharePointFieldMetadata;
@@ -257,9 +258,10 @@ export const FormField: React.FC<FormFieldProps> = ({
             required={isRequired}
             disabled={isDisabled}
             placeholder={placeholder}
-            lookupList={fieldMetadata.LookupListName || 'Categories'}
+            lookupList={fieldMetadata.LookupListName || ''}
             lookupField={fieldMetadata.LookupFieldName || 'Title'}
             {...componentProps}
+            multiSelect={false}
           />
         );
 
@@ -271,10 +273,10 @@ export const FormField: React.FC<FormFieldProps> = ({
             required={isRequired}
             disabled={isDisabled}
             placeholder={placeholder}
-            multiSelect
-            lookupList={fieldMetadata.LookupListName || 'Categories'}
+            lookupList={fieldMetadata.LookupListName || ''}
             lookupField={fieldMetadata.LookupFieldName || 'Title'}
             {...componentProps}
+            multiSelect={true}
           />
         );
 
@@ -287,6 +289,7 @@ export const FormField: React.FC<FormFieldProps> = ({
             disabled={isDisabled}
             placeholder={placeholder}
             {...componentProps}
+            multiSelect={false}
           />
         );
 
@@ -298,8 +301,8 @@ export const FormField: React.FC<FormFieldProps> = ({
             required={isRequired}
             disabled={isDisabled}
             placeholder={placeholder}
-            multiSelect
             {...componentProps}
+            multiSelect={true}
           />
         );
 

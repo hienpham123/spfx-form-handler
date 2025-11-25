@@ -1,0 +1,8 @@
+.th-Dropdown {
+    width: 100% !important;
+}
+
+/* Error border for ReactSelectify */
+.form-field-error .ms-TextField-fieldGroup {
+  border: 1px solid rgb(164, 38, 44) !important;
+}
