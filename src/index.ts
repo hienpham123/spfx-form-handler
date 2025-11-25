@@ -1,5 +1,5 @@
 // Core exports
-export { FormProvider, useFormContext, setGlobalFormContext, getGlobalFormContext } from './core/FormProvider';
+export { FormProvider, useFormContext, setGlobalFormContext, getGlobalFormContext, registerSharePointWeb } from './core/FormProvider';
 export { useForm, useField } from './core/hooks';
 export { withForm, FormConsumer } from './core/hoc';
 export type { WithFormProps } from './core/hoc';
@@ -49,12 +49,10 @@ export type {
   SharePointListConfig,
   UseFormReturn,
   UseFieldReturn,
-  MockApiConfig,
   ApiResponse,
 } from './types';
 
 // Service exports
-export { MockApiService, mockApi, createSpfxApiService } from './services/mockApi';
 export { createSpfxApiService as createSpfxApiServiceFromPnp, createSpfxRestApiService } from './services/spfxApiService';
 
 // Import styles
