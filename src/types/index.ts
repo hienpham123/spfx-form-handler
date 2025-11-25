@@ -87,13 +87,17 @@ export interface FormTouched {
   [key: string]: boolean;
 }
 
+export interface FormDirtyFields {
+  [key: string]: boolean;
+}
+
 export interface SharePointListConfig {
   listName: string;
   listUrl?: string; // Optional, defaults to current web
   itemId?: number; // If provided, will load existing item data
   apiService?: {
     getItem: (listName: string, itemId: number, listUrl?: string) => Promise<ApiResponse<any>>;
-  }; // Custom API service, defaults to mockApi
+  }; // Custom API service
   fieldMapping?: Record<string, string>; // Map SharePoint field names to form field names
 }
 
@@ -113,9 +117,10 @@ export interface FormConfig {
   listUrl?: string; // SharePoint list URL (optional) - can be list URL or web URL
   userServiceUrl?: string; // SharePoint web URL for user search (optional, defaults to extracted web URL from listUrl)
   fieldMapping?: Record<string, string>; // Map SharePoint field names to form field names (bidirectional)
+  fields?: string[]; // List of field names to automatically select and expand (lookup fields will be auto-expanded)
   autoSave?: boolean; // Auto save to SharePoint on submit (default: true if listName is provided)
   apiService?: {
-    getItem: (listName: string, itemId: number, listUrl?: string) => Promise<ApiResponse<any>>;
+    getItem: (listName: string, itemId: number, listUrl?: string, fieldNames?: string[]) => Promise<ApiResponse<any>>;
     addItem: (listName: string, data: any, listUrl?: string) => Promise<ApiResponse<any>>;
     updateItem: (listName: string, itemId: number, data: any, listUrl?: string) => Promise<ApiResponse<any>>;
     getListItems?: (listName: string, listUrl?: string) => Promise<ApiResponse<any>>; // Optional: for loading lookup options
@@ -151,6 +156,7 @@ export interface UseFormReturn {
   values: FormState;
   errors: FormErrors;
   touched: FormTouched;
+  dirtyFields: FormDirtyFields;
   isSubmitting: boolean;
   isLoading: boolean; // Loading state when fetching item data
   isValid: boolean;
@@ -172,6 +178,7 @@ export interface UseFormReturn {
   validate: () => boolean;
   validateField: (name: string) => FieldError | null;
   reloadItemData: () => Promise<void>; // Reload item data from SharePoint
+  registerField?: (fieldName: string) => void; // Register field name for auto field collection
 }
 
 export interface UseFieldReturn {
@@ -180,12 +187,6 @@ export interface UseFieldReturn {
   touched: boolean;
   onChange: (value: any) => void;
   onBlur: () => void;
-}
-
-export interface MockApiConfig {
-  delay?: number;
-  shouldFail?: boolean;
-  failRate?: number;
 }
 
 export interface ApiResponse<T = any> {

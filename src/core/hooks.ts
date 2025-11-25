@@ -15,6 +15,7 @@ export const useForm = (): UseFormReturn => {
     values: context.values,
     errors: context.errors,
     touched: context.touched,
+    dirtyFields: context.dirtyFields,
     isSubmitting: context.isSubmitting,
     isLoading: context.isLoading,
     isValid: context.isValid,
