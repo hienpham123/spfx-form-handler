@@ -3,20 +3,14 @@ import {
   FormProvider,
   useForm,
   FormField,
+  registerSharePointWeb, // ✅ Register Web class để FormProvider có thể tự động tạo apiService
 } from '../src';
 import { PrimaryButton, Stack, MessageBar, MessageBarType, Spinner, Text } from '@fluentui/react';
+import { Web } from '@pnp/sp';
 
-/**
- * Real World Example: Using FormField with actual SharePoint
- * 
- * Chỉ cần truyền endpoint và listName, FormField sẽ tự động:
- * - Load field metadata từ SharePoint
- * - Render đúng component dựa trên field type
- * - Load options cho Choice/Lookup fields
- * 
- * Endpoint: https://hieho.sharepoint.com/sites/apps
- * List Name: Projects
- */
+// ✅ Register Web class để FormProvider có thể tự động tạo apiService
+registerSharePointWeb(Web);
+
 const RealWorldForm: React.FC = () => {
   const form = useForm();
 
@@ -28,12 +22,23 @@ const RealWorldForm: React.FC = () => {
     );
   }
 
+  // Check if running in SharePoint page
+  const isInSharePoint = typeof window !== 'undefined' &&
+    (!!(window as any)._spPageContextInfo || window.location.href.includes('sharepoint.com'));
+
   return (
     <div style={{ padding: 20, maxWidth: 600, margin: '0 auto' }}>
       <h1>Project Form - Real SharePoint Example</h1>
+      {!isInSharePoint && (
+        <MessageBar messageBarType={MessageBarType.warning} isMultiline style={{ marginBottom: 16 }}>
+          ⚠️ <strong>Warning:</strong> Running standalone. To avoid 403 errors, please run this app in a SharePoint page.
+          <br />
+          Cookies authentication only works when the app is embedded in a SharePoint page.
+        </MessageBar>
+      )}
       <p>
         <strong>List:</strong> {form.listName || 'Projects'}<br />
-        <strong>Site:</strong> {form.listUrl || 'https://hieho.sharepoint.com/sites/apps'}<br />
+        <strong>Site:</strong> {form.listUrl || 'https://hieho.sharepoint.com/sites'}<br />
         <strong>Mode:</strong> {form.itemId ? `Edit Item #${form.itemId}` : 'Create New'}
       </p>
 
@@ -41,25 +46,21 @@ const RealWorldForm: React.FC = () => {
         <Stack tokens={{ childrenGap: 16 }}>
           {/* Chỉ cần truyền Internal Field Name từ SharePoint */}
           {/* FormField sẽ tự động detect type và render đúng component */}
-          
+
           <FormField fieldName="Title" />
-          
-          <FormField fieldName="ProjectCode" />
-          
+
+          <FormField fieldName="ItemType" />
+
           <FormField fieldName="StartDate" />
-          
-          <FormField fieldName="EndDate" />
-          
-          <FormField fieldName="Status" />
-          
-          <FormField fieldName="Category" />
-          
-          <FormField fieldName="AssignedTo" />
-          
-          <FormField fieldName="Description" />
-          
+
+          <FormField fieldName="Owner" />
+
           <FormField fieldName="IsActive" />
-          
+
+          <FormField fieldName="CostCode" />
+
+          <FormField fieldName="Link" />
+
           <FormField fieldName="Attachments" />
 
           {/* Display form state for debugging */}
@@ -94,365 +95,94 @@ const RealWorldForm: React.FC = () => {
 };
 
 const RealWorldApp: React.FC = () => {
-  // In real SPFx project, you would get context from props
-  // const { context } = props;
-  // 
-  // Initialize SPFx:
-  // import { sp } from '@pnp/sp';
-  // sp.setup({ spfxContext: context });
-
-  // Real API service configuration for SharePoint
-  // Uncomment and use when you have SPFx context
-  const realApiService = {
-    getItem: async (listName: string, itemId: number, listUrl?: string) => {
-      // Real SPFx implementation:
-      /*
-      import { sp } from '@pnp/sp';
-      
-      const web = listUrl 
-        ? sp.site.openWeb(listUrl)
-        : sp.web;
-      
-      const item = await web
-        .lists.getByTitle(listName)
-        .items.getById(itemId)
-        .get();
-      
-      return { success: true, data: item };
-      */
-      
-      // Mock for demo (remove in production)
-      return {
-        success: true,
-        data: {
-          Id: itemId,
-          Title: `Project ${itemId}`,
-          ProjectCode: `PRJ-${itemId}`,
-          StartDate: new Date().toISOString(),
-          Status: 'Active',
-        },
-      };
-    },
-
-    addItem: async (listName: string, data: any, listUrl?: string) => {
-      // Real SPFx implementation:
-      /*
-      import { sp } from '@pnp/sp';
-      
-      const web = listUrl 
-        ? sp.site.openWeb(listUrl)
-        : sp.web;
-      
-      const result = await web
-        .lists.getByTitle(listName)
-        .items.add(data);
-      
-      return { success: true, data: result.data };
-      */
-      
-      // Mock for demo (remove in production)
-      return {
-        success: true,
-        data: {
-          ...data,
-          Id: Math.floor(Math.random() * 1000),
-        },
-      };
-    },
-
-    updateItem: async (listName: string, itemId: number, data: any, listUrl?: string) => {
-      // Real SPFx implementation:
-      /*
-      import { sp } from '@pnp/sp';
-      
-      const web = listUrl 
-        ? sp.site.openWeb(listUrl)
-        : sp.web;
-      
-      await web
-        .lists.getByTitle(listName)
-        .items.getById(itemId)
-        .update(data);
-      
-      const updated = await web
-        .lists.getByTitle(listName)
-        .items.getById(itemId)
-        .get();
-      
-      return { success: true, data: updated };
-      */
-      
-      // Mock for demo (remove in production)
-      return {
-        success: true,
-        data: {
-          ...data,
-          Id: itemId,
-        },
-      };
-    },
-
-    getListItems: async (listName: string, listUrl?: string) => {
-      // Real SPFx implementation:
-      /*
-      import { sp } from '@pnp/sp';
-      
-      const web = listUrl 
-        ? sp.site.openWeb(listUrl)
-        : sp.web;
-      
-      const items = await web
-        .lists.getByTitle(listName)
-        .items
-        .select('Id', 'Title')
-        .get();
-      
-      return { success: true, data: items };
-      */
-      
-      // Mock for demo (remove in production)
-      return {
-        success: true,
-        data: [
-          { Id: 1, Title: 'Option 1' },
-          { Id: 2, Title: 'Option 2' },
-        ],
-      };
-    },
-
-    uploadFile: async (listName: string, itemId: number, file: File, fileName?: string, listUrl?: string) => {
-      // Real SPFx implementation:
-      /*
-      import { sp } from '@pnp/sp';
-      
-      const web = listUrl 
-        ? sp.site.openWeb(listUrl)
-        : sp.web;
-      
-      const attachmentFolder = web
-        .lists.getByTitle(listName)
-        .items.getById(itemId)
-        .attachmentFiles;
-      
-      const arrayBuffer = await file.arrayBuffer();
-      const result = await attachmentFolder.add(fileName || file.name, arrayBuffer);
-      
-      return { success: true, data: result.data };
-      */
-      
-      // Mock for demo (remove in production)
-      return {
-        success: true,
-        data: {
-          FileName: fileName || file.name,
-          ServerRelativeUrl: `/Lists/${listName}/Attachments/${itemId}/${fileName || file.name}`,
-        },
-      };
-    },
-
-    getFieldMetadata: async (listName: string, fieldName: string, listUrl?: string) => {
-      // Real SPFx implementation:
-      /*
-      import { sp } from '@pnp/sp';
-      
-      const web = listUrl 
-        ? sp.site.openWeb(listUrl)
-        : sp.web;
-      
-      const field = await web
-        .lists.getByTitle(listName)
-        .fields
-        .getByInternalNameOrTitle(fieldName)
-        .get();
-      
-      // Map SharePoint field to our metadata format
-      const metadata = {
-        InternalName: field.InternalName,
-        Title: field.Title,
-        Type: field.TypeAsString || field.Type,
-        Required: field.Required || false,
-        ReadOnlyField: field.ReadOnlyField || false,
-        Choices: field.Choices || undefined,
-        LookupListId: field.LookupListId || undefined,
-        LookupListName: field.LookupList || undefined,
-        LookupFieldName: field.LookupField || undefined,
-        DefaultValue: field.DefaultValue || undefined,
-        Description: field.Description || undefined,
-        MaxLength: field.MaxLength || undefined,
-        Min: field.Min || undefined,
-        Max: field.Max || undefined,
-      };
-      
-      return { success: true, data: metadata };
-      */
-      
-      // Mock for demo (remove in production)
-      const mockMetadata: any = {
-        Title: {
-          InternalName: 'Title',
-          Title: 'Title',
-          Type: 'Text',
-          Required: true,
-          ReadOnlyField: false,
-          MaxLength: 255,
-        },
-        ProjectCode: {
-          InternalName: 'ProjectCode',
-          Title: 'Project Code',
-          Type: 'Text',
-          Required: true,
-          ReadOnlyField: false,
-        },
-        StartDate: {
-          InternalName: 'StartDate',
-          Title: 'Start Date',
-          Type: 'DateTime',
-          Required: false,
-          ReadOnlyField: false,
-        },
-        EndDate: {
-          InternalName: 'EndDate',
-          Title: 'End Date',
-          Type: 'DateTime',
-          Required: false,
-          ReadOnlyField: false,
-        },
-        Status: {
-          InternalName: 'Status',
-          Title: 'Status',
-          Type: 'Choice',
-          Required: false,
-          ReadOnlyField: false,
-          Choices: ['Active', 'On Hold', 'Completed', 'Cancelled'],
-        },
-        Category: {
-          InternalName: 'Category',
-          Title: 'Category',
-          Type: 'Lookup',
-          Required: false,
-          ReadOnlyField: false,
-          LookupListName: 'Categories',
-          LookupFieldName: 'Title',
-        },
-        AssignedTo: {
-          InternalName: 'AssignedTo',
-          Title: 'Assigned To',
-          Type: 'User',
-          Required: false,
-          ReadOnlyField: false,
-        },
-        Description: {
-          InternalName: 'Description',
-          Title: 'Description',
-          Type: 'Note',
-          Required: false,
-          ReadOnlyField: false,
-        },
-        IsActive: {
-          InternalName: 'IsActive',
-          Title: 'Is Active',
-          Type: 'Boolean',
-          Required: false,
-          ReadOnlyField: false,
-        },
-        Attachments: {
-          InternalName: 'Attachments',
-          Title: 'Attachments',
-          Type: 'Attachment',
-          Required: false,
-          ReadOnlyField: false,
-        },
-      };
-
-      return {
-        success: true,
-        data: mockMetadata[fieldName] || {
-          InternalName: fieldName,
-          Title: fieldName,
-          Type: 'Text',
-          Required: false,
-          ReadOnlyField: false,
-        },
-      };
-    },
-  };
+  // ✅ Không cần tạo apiService nữa - FormProvider sẽ tự động tạo từ listUrl
 
   return (
     <FormProvider
       config={{
-        // Chỉ cần truyền endpoint và listName
-        id: 0, // 0 = new, > 0 = edit existing
-        listName: 'Projects', // ✅ SharePoint list name
-        listUrl: 'https://hieho.sharepoint.com/sites/apps', // ✅ Web URL hoặc List URL
-        // userServiceUrl: 'https://hieho.sharepoint.com/sites/apps', // Optional: Web URL riêng cho user search (auto-extracted từ listUrl nếu không có)
-        
-        // Real API service - uncomment và config khi có SPFx context
-        apiService: realApiService,
-        
+        // ✅ Chỉ cần truyền id, listName, listUrl và fields
+        // ✅ apiService sẽ tự động được tạo từ listUrl (không cần truyền vào nữa)
+        id: 3, // 0 = new, > 0 = edit existing
+        listName: 'DemoList', // ✅ SharePoint list name
+        listUrl: 'http://localhost:8080/sites/Developer', // ✅ Web URL hoặc List URL - tự động tạo apiService từ đây
+        // userServiceUrl: 'https://hieho.sharepoint.com/sites', // Optional: Web URL riêng cho user search (auto-extracted từ listUrl nếu không có)
+
         // Auto save to SharePoint
         autoSave: true,
-        
+
         // Validation (optional)
         validationSchema: {
           Title: {
             required: true,
             minLength: 3,
           },
+          ItemType: {
+            required: true,
+            minLength: 3,
+          },
+          StartDate: {
+            required: true,
+          },
+          Owner: {
+            required: true,
+          },
+          CostCode: {
+            required: true,
+          },
+          Link: {
+            required: true,
+          },
+          Attachments: {
+            required: true,
+          },
         },
-        
+
         // Transform data before saving
         onBeforeSave: (values) => {
           console.log('Original values:', values);
-          
+
           // Transform data before saving to SharePoint
           return {
             ...values,
-            // Format dates to ISO string
-            StartDate: values.StartDate ? new Date(values.StartDate).toISOString() : null,
-            EndDate: values.EndDate ? new Date(values.EndDate).toISOString() : null,
-            // Add computed fields
-            Modified: new Date().toISOString(),
-            // Ensure required fields have defaults
-            Status: values.Status || 'Draft',
           };
         },
-        
+
         // Custom validation before save
         onValidSave: (form) => {
           console.log('Validating before save...');
-          
+
           // Check if form is valid
           if (!form.isValid) {
             console.log('Form validation failed');
             return false;
           }
-          
+
           // Business rule: End date must be after start date
           if (form.values.StartDate && form.values.EndDate) {
             const start = new Date(form.values.StartDate);
             const end = new Date(form.values.EndDate);
             if (start > end) {
-              form.setError('EndDate', { 
-                message: 'End date must be after start date', 
-                type: 'custom' 
+              form.setError('EndDate', {
+                message: 'End date must be after start date',
+                type: 'custom'
               });
               return false;
             }
           }
-          
+
           // Business rule: Draft items must have description
           if (form.values.Status === 'Draft' && !form.values.Description) {
-            form.setError('Description', { 
-              message: 'Description is required for draft projects', 
-              type: 'required' 
+            form.setError('Description', {
+              message: 'Description is required for draft projects',
+              type: 'required'
             });
             return false;
           }
-          
+
           console.log('Custom validation passed');
           return true; // Allow save
         },
-        
+
         // Callbacks
         onItemLoaded: (itemData) => {
           console.log('Project loaded:', itemData);
