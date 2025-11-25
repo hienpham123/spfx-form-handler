@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { FormState, FormErrors, FormTouched } from '../../types';
-import { validateForm, validateField } from '../../utils/validation';
+import { validateForm } from '../../utils/validation';
 import { mapFormDataToSharePoint } from '../../utils/formHelpers';
 
 interface UseFormSubmitProps {

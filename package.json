@@ -21,7 +21,7 @@
     "./index.css": "./dist/index.css"
   },
   "scripts": {
-    "build": "rollup -c && rm -f dist/css-bundle.js",
+    "build": "rollup -c && (if exist dist\\css-bundle.js del dist\\css-bundle.js || true)",
     "dev": "vite",
     "preview": "vite preview",
     "prepublishOnly": "npm run build"
