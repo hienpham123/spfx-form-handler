@@ -1,16 +1,19 @@
 # SPFx Form Handler
 
-A powerful form handling library for SPFx and React applications with validation, state management, and mock API support. Works seamlessly with both Functional Components and Class Components.
+A powerful form handling library for SPFx and React applications with validation, state management, and SharePoint integration. Works seamlessly with both Functional Components and Class Components.
 
 ## Features
 
 - ✅ **Form State Management** - Centralized form state with React Context
 - ✅ **Validation** - Built-in validation rules (required, email, min/max length, custom validators)
 - ✅ **Fluent UI Integration** - Pre-built form components using Fluent UI
-- ✅ **Mock API Support** - Test forms without a SharePoint tenant
+- ✅ **SharePoint Integration** - Automatic API service creation from `listUrl`
+- ✅ **Dirty Fields Tracking** - Only update changed fields when editing items
 - ✅ **TypeScript Support** - Full TypeScript support with type definitions
 - ✅ **Class Component Support** - Works with both functional and class components
-- ✅ **Easy SPFx Integration** - Easy to replace mock API with real SPFx API calls
+- ✅ **Auto Field Detection** - Automatically detects SharePoint field types and renders correct components
+- ✅ **Attachment Handling** - Upload, delete, and preview attachments
+- ✅ **User & Lookup Fields** - Automatic single/multi-select detection
 
 ## Installation
 
@@ -20,7 +23,9 @@ npm install spfx-form-handler
 
 ## Quick Start
 
-### Method 1: Using FormField (Recommended for SharePoint)
+### Function Component Example
+
+#### Method 1: Using FormField (Recommended for SharePoint)
 
 **Easiest way** - Just pass SharePoint Internal Field Names. FormField automatically detects field types and renders the correct component.
 
@@ -30,22 +35,46 @@ import {
   FormProvider,
   useForm,
   FormField,
+  registerSharePointWeb,
 } from 'spfx-form-handler';
+import { Web } from '@pnp/sp';
+import { PrimaryButton, Stack } from '@fluentui/react';
 import '@fluentui/react/dist/css/fabric.min.css';
+
+// Register Web class for automatic API service creation
+registerSharePointWeb(Web);
 
 const MyForm: React.FC = () => {
   const form = useForm();
 
+  if (form.isLoading) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <form onSubmit={form.handleSubmit}>
-      {/* FormField automatically detects field type from SharePoint */}
-      <FormField fieldName="Title" />
-      <FormField fieldName="Category" />
-      <FormField fieldName="Status" />
-      <FormField fieldName="StartDate" />
-      <FormField fieldName="AssignedTo" />
-      
-      <button type="submit">Submit</button>
+      <Stack tokens={{ childrenGap: 16 }}>
+        {/* FormField automatically detects field type from SharePoint */}
+        <FormField fieldName="Title" />
+        <FormField fieldName="ItemType" />
+        <FormField fieldName="StartDate" />
+        <FormField fieldName="Owner" />
+        <FormField fieldName="Link" />
+        <FormField fieldName="Attachments" />
+        
+        <PrimaryButton
+          type="submit"
+          text={form.itemId ? "Update" : "Create"}
+          disabled={form.isSubmitting}
+        />
+        
+        {/* Display dirty fields */}
+        {Object.keys(form.dirtyFields).length > 0 && (
+          <div>
+            <strong>Changed fields:</strong> {Object.keys(form.dirtyFields).join(', ')}
+          </div>
+        )}
+      </Stack>
     </form>
   );
 };
@@ -54,12 +83,22 @@ const App: React.FC = () => {
   return (
     <FormProvider
       config={{
-        // Chỉ cần truyền endpoint và listName
-        listName: 'Projects',
-        listUrl: 'https://hieho.sharepoint.com/sites/apps', // Web URL hoặc List URL (sẽ tự động extract web URL)
-        // userServiceUrl: 'https://hieho.sharepoint.com/sites/apps', // Optional: Web URL riêng cho user search
-        id: 0, // 0 = new, > 0 = edit
-        autoSave: true, // Auto save to SharePoint
+        id: 0, // 0 = new, > 0 = edit existing
+        listName: 'DemoList',
+        listUrl: 'http://localhost:8080/sites/Developer', // Web URL or List URL
+        autoSave: true,
+        validationSchema: {
+          Title: { required: true, minLength: 3 },
+          ItemType: { required: true },
+          StartDate: { required: true },
+          Owner: { required: true },
+        },
+        onSaveSuccess: (data) => {
+          alert(`Item ${data.Id ? 'updated' : 'created'} successfully!`);
+        },
+        onSaveError: (error) => {
+          alert(`Error: ${error}`);
+        },
       }}
     >
       <MyForm />
@@ -68,7 +107,7 @@ const App: React.FC = () => {
 };
 ```
 
-### Method 2: Using Individual Components
+#### Method 2: Using Individual Components
 
 For more control, use individual form components:
 
@@ -79,6 +118,10 @@ import {
   useForm,
   FormTextField,
   FormDropdown,
+  FormDatePicker,
+  FormUserPicker,
+  FormLookup,
+  FormAttachmentPicker,
   PrimaryButton,
 } from 'spfx-form-handler';
 import '@fluentui/react/dist/css/fabric.min.css';
@@ -94,13 +137,6 @@ const MyForm: React.FC = () => {
         required
       />
       
-      <FormTextField
-        name="email"
-        label="Email"
-        type="email"
-        required
-      />
-      
       <FormDropdown
         name="status"
         label="Status"
@@ -111,7 +147,44 @@ const MyForm: React.FC = () => {
         required
       />
       
-      <PrimaryButton type="submit" text="Submit" />
+      <FormDatePicker
+        name="startDate"
+        label="Start Date"
+        required
+      />
+      
+      <FormUserPicker
+        name="assignedTo"
+        label="Assigned To"
+        required
+      />
+      
+      <FormLookup
+        name="category"
+        label="Category"
+        lookupList="Categories"
+        required
+      />
+      
+      <FormAttachmentPicker
+        name="attachments"
+        label="Attachments"
+        maxSize={10 * 1024 * 1024}
+        allowedFileTypes={['pdf', 'docx', 'jpg']}
+      />
+      
+      <PrimaryButton
+        type="submit"
+        text="Submit"
+        disabled={form.isSubmitting || !form.isValid}
+      />
+      
+      {/* Access dirty fields */}
+      {Object.keys(form.dirtyFields).length > 0 && (
+        <div>
+          Changed: {Object.keys(form.dirtyFields).join(', ')}
+        </div>
+      )}
     </form>
   );
 };
@@ -122,25 +195,21 @@ const App: React.FC = () => {
       config={{
         initialValues: {
           title: '',
-          email: '',
           status: undefined,
+          startDate: null,
+          assignedTo: null,
+          category: null,
+          attachments: [],
         },
         validationSchema: {
-          title: {
-            required: true,
-            minLength: 3,
-          },
-          email: {
-            required: true,
-            email: true,
-          },
-          status: {
-            required: true,
-          },
+          title: { required: true, minLength: 3 },
+          status: { required: true },
+          startDate: { required: true },
+          assignedTo: { required: true },
+          category: { required: true },
         },
         onSubmit: async (values) => {
           console.log('Form submitted:', values);
-          // Your submission logic here
         },
       }}
     >
@@ -150,7 +219,322 @@ const App: React.FC = () => {
 };
 ```
 
+### Class Component Example
+
+#### Method 1: Using withForm HOC (Recommended)
+
+Wrap your class component with `withForm` HOC to inject form context as props.
+
+```tsx
+import React from 'react';
+import { 
+  FormProvider, 
+  withForm, 
+  WithFormProps,
+  FormField,
+  PrimaryButton,
+  registerSharePointWeb,
+} from 'spfx-form-handler';
+import { Web } from '@pnp/sp';
+import { Stack, MessageBar, MessageBarType } from '@fluentui/react';
+import '@fluentui/react/dist/css/fabric.min.css';
+
+registerSharePointWeb(Web);
+
+interface ProjectFormProps extends WithFormProps {
+  projectId?: number;
+}
+
+class ProjectFormComponent extends React.Component<ProjectFormProps> {
+  componentDidMount() {
+    const { form, projectId } = this.props;
+    
+    if (projectId && projectId > 0) {
+      form.reloadItemData();
+    }
+  }
+
+  componentDidUpdate(prevProps: ProjectFormProps) {
+    const { form, projectId } = this.props;
+    
+    if (projectId !== prevProps.projectId && projectId && projectId > 0) {
+      form.reloadItemData();
+    }
+  }
+
+  render() {
+    const { form, projectId } = this.props;
+
+    if (form.isLoading) {
+      return <div>Loading project data...</div>;
+    }
+
+    const dirtyFieldNames = Object.keys(form.dirtyFields).filter(key => form.dirtyFields[key]);
+
+    return (
+      <div style={{ padding: 20, maxWidth: 600, margin: '0 auto' }}>
+        <h1>Project Form - Class Component</h1>
+        
+        {dirtyFieldNames.length > 0 && (
+          <MessageBar messageBarType={MessageBarType.info} style={{ marginBottom: 16 }}>
+            Changed fields: {dirtyFieldNames.join(', ')}
+          </MessageBar>
+        )}
+
+        <form onSubmit={form.handleSubmit}>
+          <Stack tokens={{ childrenGap: 16 }}>
+            <FormField fieldName="Title" />
+            <FormField fieldName="ItemType" />
+            <FormField fieldName="StartDate" />
+            <FormField fieldName="Owner" />
+            <FormField fieldName="Link" />
+            <FormField fieldName="Attachments" />
+            
+            <PrimaryButton
+              type="submit"
+              text={projectId ? "Update Project" : "Create Project"}
+              disabled={form.isSubmitting || !form.isValid}
+            />
+            
+            <button 
+              type="button" 
+              onClick={() => form.reset()}
+              disabled={form.isSubmitting}
+            >
+              Reset
+            </button>
+            
+            {projectId && (
+              <button 
+                type="button" 
+                onClick={() => form.reloadItemData()}
+                disabled={form.isSubmitting || form.isLoading}
+              >
+                Reload Data
+              </button>
+            )}
+          </Stack>
+        </form>
+      </div>
+    );
+  }
+}
+
+// Wrap component with withForm HOC
+const ProjectForm = withForm(ProjectFormComponent);
+
+// Use in your app
+const App: React.FC = () => {
+  return (
+    <FormProvider
+      config={{
+        id: 1, // 0 = new, > 0 = edit
+        listName: 'DemoList',
+        listUrl: 'http://localhost:8080/sites/Developer',
+        autoSave: true,
+        validationSchema: {
+          Title: { required: true, minLength: 3 },
+          ItemType: { required: true },
+          StartDate: { required: true },
+          Owner: { required: true },
+        },
+        onSaveSuccess: (data) => {
+          alert(`Project ${data.Id ? 'updated' : 'created'} successfully!`);
+        },
+        onSaveError: (error) => {
+          alert(`Error: ${error}`);
+        },
+      }}
+    >
+      <ProjectForm projectId={1} />
+    </FormProvider>
+  );
+};
+```
+
+#### Method 2: Using Individual Components in Class Component
+
+```tsx
+import React from 'react';
+import { 
+  FormProvider, 
+  withForm, 
+  WithFormProps,
+  FormTextField,
+  FormDropdown,
+  FormDatePicker,
+  FormUserPicker,
+  FormLookup,
+  PrimaryButton,
+} from 'spfx-form-handler';
+import { Stack } from '@fluentui/react';
+import '@fluentui/react/dist/css/fabric.min.css';
+
+interface MyFormProps extends WithFormProps {
+  title?: string;
+}
+
+class MyFormComponent extends React.Component<MyFormProps> {
+  render() {
+    const { form, title = 'My Form' } = this.props;
+    
+    return (
+      <form onSubmit={form.handleSubmit}>
+        <h2>{title}</h2>
+        
+        <Stack tokens={{ childrenGap: 16 }}>
+          <FormTextField
+            name="title"
+            label="Title"
+            required
+          />
+          
+          <FormTextField
+            name="email"
+            label="Email"
+            type="email"
+            required
+          />
+          
+          <FormDropdown
+            name="status"
+            label="Status"
+            options={[
+              { key: 'active', text: 'Active' },
+              { key: 'inactive', text: 'Inactive' }
+            ]}
+            required
+          />
+          
+          <FormDatePicker
+            name="startDate"
+            label="Start Date"
+            required
+          />
+          
+          <FormUserPicker
+            name="assignedTo"
+            label="Assigned To"
+            required
+          />
+          
+          <FormLookup
+            name="category"
+            label="Category"
+            lookupList="Categories"
+            required
+          />
+          
+          <PrimaryButton
+            type="submit"
+            text="Submit"
+            disabled={form.isSubmitting || !form.isValid}
+          />
+          
+          <button 
+            type="button" 
+            onClick={() => form.reset()}
+          >
+            Reset
+          </button>
+          
+          {/* Display dirty fields */}
+          {Object.keys(form.dirtyFields).length > 0 && (
+            <div>
+              <strong>Changed fields:</strong> {Object.keys(form.dirtyFields).join(', ')}
+            </div>
+          )}
+        </Stack>
+      </form>
+    );
+  }
+}
+
+const MyForm = withForm(MyFormComponent);
+
+const App: React.FC = () => {
+  return (
+    <FormProvider
+      config={{
+        initialValues: {
+          title: '',
+          email: '',
+          status: undefined,
+          startDate: null,
+          assignedTo: null,
+          category: null,
+        },
+        validationSchema: {
+          title: { required: true, minLength: 3 },
+          email: { required: true, email: true },
+          status: { required: true },
+          startDate: { required: true },
+          assignedTo: { required: true },
+          category: { required: true },
+        },
+        onSubmit: async (values) => {
+          console.log('Submitted:', values);
+        },
+      }}
+    >
+      <MyForm title="User Registration" />
+    </FormProvider>
+  );
+};
+```
+
+## Dirty Fields Tracking
+
+The library automatically tracks which fields have been changed. When updating an existing item, only the changed fields are sent to SharePoint, improving performance and reducing conflicts.
+
+### Accessing Dirty Fields
+
+```tsx
+// Function Component
+const form = useForm();
+const dirtyFieldNames = Object.keys(form.dirtyFields).filter(key => form.dirtyFields[key]);
+console.log('Changed fields:', dirtyFieldNames);
+
+// Class Component
+const { form } = this.props;
+const dirtyFieldNames = Object.keys(form.dirtyFields).filter(key => form.dirtyFields[key]);
+console.log('Changed fields:', dirtyFieldNames);
+```
+
+### How It Works
+
+- **New Items (id = 0)**: All fields are sent when creating a new item
+- **Existing Items (id > 0)**: Only fields that have been modified are sent when updating
+- **Automatic Tracking**: Fields are automatically marked as dirty when their values change
+- **Reset on Save**: Dirty fields are reset after a successful save
+
+### Example
+
+```tsx
+const form = useForm();
+
+// User changes Title and StartDate
+// form.dirtyFields = { Title: true, StartDate: true }
+
+// On submit, only Title and StartDate are sent to SharePoint
+form.handleSubmit();
+
+// After successful save, dirtyFields is reset to {}
+```
+
 ## Components
+
+### FormField
+
+Automatically detects SharePoint field type and renders the correct component. **Recommended for SharePoint forms.**
+
+```tsx
+<FormField fieldName="Title" />
+<FormField fieldName="StartDate" />
+<FormField fieldName="Owner" />
+<FormField fieldName="Link" />
+<FormField fieldName="Attachments" />
+```
 
 ### FormTextField
 
@@ -168,7 +552,7 @@ Text input field with validation support.
 
 ### FormDropdown
 
-Dropdown/select field with validation support.
+Dropdown/select field with validation support. Uses `react-selectify` for better UI.
 
 ```tsx
 <FormDropdown
@@ -223,10 +607,10 @@ Multi-choice field allowing multiple selections.
 
 ### FormLookup
 
-Lookup field for SharePoint Lookup columns. Supports both single and multi-select.
+Lookup field for SharePoint Lookup columns. Supports both single and multi-select. Automatically detects single/multi-select from SharePoint field metadata. Uses `react-selectify` with checkboxes for multi-select.
 
 ```tsx
-// Single select lookup
+// Single select lookup (auto-detected)
 <FormLookup
   name="category"
   label="Category"
@@ -234,53 +618,39 @@ Lookup field for SharePoint Lookup columns. Supports both single and multi-selec
   required
 />
 
-// Multi-select lookup
+// Multi-select lookup (auto-detected)
 <FormLookup
   name="tags"
   label="Tags"
   lookupList="Tags"
-  multiSelect
 />
 ```
 
 ### FormUserPicker
 
-User/People picker field for SharePoint User columns. Supports both single and multi-select with search functionality. Automatically loads users from SharePoint when `listUrl` or `userServiceUrl` is provided.
+User/People picker field for SharePoint User columns. Supports both single and multi-select with search functionality. Automatically detects single/multi-select from SharePoint field metadata. Automatically loads users from SharePoint when `listUrl` or `userServiceUrl` is provided.
 
 ```tsx
-// Single select user picker
+// Single select user picker (auto-detected)
 <FormUserPicker
   name="assignedTo"
   label="Assigned To"
   required
 />
 
-// Multi-select user picker
+// Multi-select user picker (auto-detected)
 <FormUserPicker
   name="teamMembers"
   label="Team Members"
-  multiSelect
   allowGroups // Allow selecting groups in addition to users
 />
 ```
 
-**Note:** `FormUserPicker` requires a web URL (not list URL) to search users. The library automatically extracts the web URL from `listUrl` if it's a list URL, or you can provide `userServiceUrl` explicitly:
-
-```tsx
-<FormProvider
-  config={{
-    listName: 'Projects',
-    listUrl: 'https://hieho.sharepoint.com/sites/apps/Lists/Projects', // List URL
-    userServiceUrl: 'https://hieho.sharepoint.com/sites/apps', // Web URL for user search (optional, auto-extracted from listUrl)
-  }}
->
-  <FormUserPicker name="assignedTo" />
-</FormProvider>
-```
+**Note:** `FormUserPicker` requires a web URL (not list URL) to search users. The library automatically extracts the web URL from `listUrl` if it's a list URL, or you can provide `userServiceUrl` explicitly.
 
 ### FormAttachmentPicker
 
-Attachment field for SharePoint Attachment columns. Supports file upload, preview, and removal.
+Attachment field for SharePoint Attachment columns. Supports file upload, preview, and removal. Click on file names to open them in a new tab.
 
 ```tsx
 <FormAttachmentPicker
@@ -290,17 +660,6 @@ Attachment field for SharePoint Attachment columns. Supports file upload, previe
   allowedFileTypes={['pdf', 'docx', 'jpg', 'png']}
   maxFiles={5}
   required
-/>
-```
-
-### FormCustomField
-
-Render custom field using `onRenderField` from FormProvider config.
-
-```tsx
-<FormCustomField
-  name="customField"
-  fallback={<Text>Custom field not configured</Text>}
 />
 ```
 
@@ -350,63 +709,54 @@ validationSchema: {
 }
 ```
 
-## Mock API Service
+## SharePoint Integration
 
-The library includes a mock API service that simulates SharePoint API calls, allowing you to test forms without a tenant.
+### Automatic API Service Creation
 
-### Using Mock API
-
-```tsx
-import { mockApi } from 'spfx-form-handler';
-
-// In your form submission
-const handleSubmit = async (values: any) => {
-  const response = await mockApi.post('/lists/items', values);
-  
-  if (response.success) {
-    console.log('Success:', response.data);
-  } else {
-    console.error('Error:', response.error);
-  }
-};
-```
-
-### Mock API Methods
-
-- `get(endpoint)` - Simulate GET request
-- `post(endpoint, data)` - Simulate POST request
-- `patch(endpoint, data)` - Simulate PATCH request
-- `delete(endpoint)` - Simulate DELETE request
-
-### Configuring Mock API
+The library can automatically create a SharePoint API service from `listUrl`. Just register the `Web` class from `@pnp/sp`:
 
 ```tsx
-import { mockApi } from 'spfx-form-handler';
+import { Web } from '@pnp/sp';
+import { registerSharePointWeb } from 'spfx-form-handler';
 
-// Configure delay and failure rate
-mockApi.updateConfig({
-  delay: 1000, // 1 second delay
-  failRate: 0.1, // 10% failure rate
-});
+// Register Web class
+registerSharePointWeb(Web);
+
+// Now FormProvider will automatically create API service from listUrl
+<FormProvider
+  config={{
+    listName: 'Projects',
+    listUrl: 'http://localhost:8080/sites/Developer', // Web URL or List URL
+    autoSave: true,
+  }}
+>
+  <MyForm />
+</FormProvider>
 ```
 
-## Real SharePoint Usage
+### Local Development with sp-rest-proxy
 
-### Example: Using with SharePoint List
+For local development, use `sp-rest-proxy` on `localhost:8080`:
 
-**Endpoint:** `https://hieho.sharepoint.com/sites/apps`  
-**List Name:** `Projects`
+```tsx
+<FormProvider
+  config={{
+    listName: 'DemoList',
+    listUrl: 'http://localhost:8080/sites/Developer', // sp-rest-proxy URL
+    autoSave: true,
+  }}
+>
+  <MyForm />
+</FormProvider>
+```
+
+### Manual API Service
+
+You can also provide a custom API service:
 
 ```tsx
 import { sp } from '@pnp/sp';
-import { FormProvider, useForm } from 'spfx-form-handler';
 
-// Initialize SPFx
-sp.setup({
-  spfxContext: context, // Your SPFx context
-});
-
-// Create API service
 const apiService = {
   getItem: async (listName, itemId, listUrl) => {
     const web = listUrl ? sp.site.openWeb(listUrl) : sp.web;
@@ -424,72 +774,19 @@ const apiService = {
     const updated = await web.lists.getByTitle(listName).items.getById(itemId).get();
     return { success: true, data: updated };
   },
+  // ... other methods
 };
 
-// Use in FormProvider
 <FormProvider
   config={{
-    id: 1, // 0 = new, > 0 = edit
     listName: 'Projects',
-    listUrl: 'https://hieho.sharepoint.com/sites/apps',
+    listUrl: 'https://tenant.sharepoint.com/sites/apps',
     apiService: apiService,
-    autoSave: true, // Auto save on submit
-    fieldMapping: {
-      Title: 'title',
-      'Project Code': 'projectCode',
-    },
+    autoSave: true,
   }}
 >
   <MyForm />
 </FormProvider>
-```
-
-See [SPFX_USAGE.md](./SPFX_USAGE.md) for complete examples.
-
-## Replacing Mock API with Real SPFx API
-
-When you have access to a SharePoint tenant, you can easily replace the mock API with real SPFx API calls.
-
-### Example with @pnp/sp
-
-```tsx
-import { sp } from '@pnp/sp';
-import { WebPartContext } from '@microsoft/sp-webpart-base';
-
-// Initialize SPFx
-sp.setup({
-  spfxContext: context,
-});
-
-// Create your API service
-export const spfxApi = {
-  get: async (endpoint: string) => {
-    try {
-      const response = await sp.web.get();
-      return { success: true, data: response };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  },
-  
-  post: async (endpoint: string, data: any) => {
-    try {
-      const listName = endpoint.split('/')[2]; // Extract list name
-      const response = await sp.web.lists.getByTitle(listName).items.add(data);
-      return { success: true, data: response.data };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  },
-  
-  // ... other methods
-};
-
-// Use in your form
-const handleSubmit = async (values: any) => {
-  const response = await spfxApi.post('/lists/MyList', values);
-  // Handle response
-};
 ```
 
 ## Hooks
@@ -505,14 +802,24 @@ const form = useForm();
 // - values: FormState
 // - errors: FormErrors
 // - touched: FormTouched
+// - dirtyFields: FormDirtyFields (new!)
 // - isSubmitting: boolean
+// - isLoading: boolean
 // - isValid: boolean
+// - itemData: any
+// - itemId: number | undefined
+// - listName: string | undefined
+// - listUrl: string | undefined
 // - setValue(name, value)
+// - getValue(name)
 // - handleChange(name, value)
 // - handleBlur(name)
 // - handleSubmit(e)
 // - reset()
+// - resetField(name)
 // - validate()
+// - validateField(name)
+// - reloadItemData()
 ```
 
 ### useField
@@ -522,302 +829,6 @@ Access a specific field's state and handlers.
 ```tsx
 const { value, error, touched, onChange, onBlur } = useField('email');
 ```
-
-## Class Component Support
-
-The library provides two ways to use form context in class components:
-
-### Method 1: Using withForm HOC (Recommended)
-
-Wrap your class component with `withForm` HOC to inject form context as props.
-
-```tsx
-import React from 'react';
-import { 
-  FormProvider, 
-  withForm, 
-  WithFormProps,
-  FormTextField,
-  FormDropdown,
-  PrimaryButton 
-} from 'spfx-form-handler';
-
-interface MyFormProps extends WithFormProps {
-  title?: string;
-}
-
-class MyFormComponent extends React.Component<MyFormProps> {
-  render() {
-    const { form, title = 'My Form' } = this.props;
-    
-    return (
-      <form onSubmit={form.handleSubmit}>
-        <h2>{title}</h2>
-        
-        <FormTextField
-          name="title"
-          label="Title"
-          required
-        />
-        
-        <FormTextField
-          name="email"
-          label="Email"
-          type="email"
-          required
-        />
-        
-        <FormDropdown
-          name="status"
-          label="Status"
-          options={[
-            { key: 'active', text: 'Active' },
-            { key: 'inactive', text: 'Inactive' }
-          ]}
-          required
-        />
-        
-        <PrimaryButton
-          type="submit"
-          text="Submit"
-          disabled={form.isSubmitting || !form.isValid}
-        />
-        
-        <button type="button" onClick={() => form.reset()}>
-          Reset
-        </button>
-      </form>
-    );
-  }
-}
-
-// Wrap component with withForm HOC
-const MyForm = withForm(MyFormComponent);
-
-// Use in your app
-const App = () => {
-  return (
-    <FormProvider
-      config={{
-        initialValues: {
-          title: '',
-          email: '',
-          status: undefined,
-        },
-        validationSchema: {
-          title: { required: true, minLength: 3 },
-          email: { required: true, email: true },
-          status: { required: true },
-        },
-        onSubmit: async (values) => {
-          console.log('Submitted:', values);
-        },
-      }}
-    >
-      <MyForm title="User Registration" />
-    </FormProvider>
-  );
-};
-```
-
-### Method 2: Using FormConsumer (Render Props Pattern)
-
-Use `FormConsumer` component for render props pattern.
-
-```tsx
-import React from 'react';
-import { 
-  FormProvider, 
-  FormConsumer,
-  FormTextField,
-  PrimaryButton 
-} from 'spfx-form-handler';
-
-class MyFormComponent extends React.Component {
-  render() {
-    return (
-      <FormConsumer>
-        {(form) => (
-          <form onSubmit={form.handleSubmit}>
-            <FormTextField
-              name="name"
-              label="Name"
-              required
-            />
-            
-            <PrimaryButton
-              type="submit"
-              text="Submit"
-              disabled={form.isSubmitting}
-            />
-            
-            <div>
-              <p>Is Valid: {form.isValid ? 'Yes' : 'No'}</p>
-              <p>Is Submitting: {form.isSubmitting ? 'Yes' : 'No'}</p>
-            </div>
-          </form>
-        )}
-      </FormConsumer>
-    );
-  }
-}
-
-const App = () => {
-  return (
-    <FormProvider
-      config={{
-        initialValues: { name: '' },
-        validationSchema: {
-          name: { required: true },
-        },
-        onSubmit: async (values) => {
-          console.log('Submitted:', values);
-        },
-      }}
-    >
-      <MyFormComponent />
-    </FormProvider>
-  );
-};
-```
-
-### Using with SharePoint List (FormField)
-
-You can use `withForm` HOC with SharePoint lists and `FormField` component:
-
-```tsx
-import React from 'react';
-import { 
-  FormProvider, 
-  withForm, 
-  WithFormProps,
-  FormField,
-  PrimaryButton 
-} from 'spfx-form-handler';
-
-interface ProjectFormProps extends WithFormProps {
-  projectId?: number;
-}
-
-class ProjectFormComponent extends React.Component<ProjectFormProps> {
-  componentDidMount() {
-    const { form, projectId } = this.props;
-    
-    // Reload data if projectId is provided
-    if (projectId && projectId > 0) {
-      form.reloadItemData();
-    }
-  }
-
-  componentDidUpdate(prevProps: ProjectFormProps) {
-    const { form, projectId } = this.props;
-    
-    // Reload when projectId changes
-    if (projectId !== prevProps.projectId && projectId && projectId > 0) {
-      form.reloadItemData();
-    }
-  }
-
-  render() {
-    const { form, projectId } = this.props;
-
-    if (form.isLoading) {
-      return <div>Loading...</div>;
-    }
-
-    return (
-      <form onSubmit={form.handleSubmit}>
-        {/* FormField automatically detects field type */}
-        <FormField fieldName="Title" />
-        <FormField fieldName="StartDate" />
-        <FormField fieldName="Status" />
-        <FormField fieldName="AssignedTo" />
-        
-        <PrimaryButton
-          type="submit"
-          text={projectId ? "Update" : "Create"}
-          disabled={form.isSubmitting || !form.isValid}
-        />
-        
-        {projectId && (
-          <button 
-            type="button" 
-            onClick={() => form.reloadItemData()}
-          >
-            Reload Data
-          </button>
-        )}
-      </form>
-    );
-  }
-}
-
-const ProjectForm = withForm(ProjectFormComponent);
-
-const App = () => {
-  return (
-    <FormProvider
-      config={{
-        id: 1, // 0 = new, > 0 = edit
-        listName: 'Projects',
-        listUrl: 'https://hieho.sharepoint.com/sites/apps',
-        autoSave: true,
-        onBeforeSave: (values) => {
-          // Transform data before saving
-          return {
-            ...values,
-            StartDate: values.StartDate ? new Date(values.StartDate).toISOString() : null,
-          };
-        },
-        onValidSave: (form) => {
-          // Custom validation
-          if (!form.isValid) return false;
-          // Add your business rules here
-          return true;
-        },
-      }}
-    >
-      <ProjectForm projectId={1} />
-    </FormProvider>
-  );
-};
-```
-
-### Available Form Methods in Class Components
-
-When using `withForm` HOC or `FormConsumer`, you have access to all form methods:
-
-```tsx
-const { form } = this.props; // or from FormConsumer
-
-// Form state
-form.values          // Current form values
-form.errors          // Form errors
-form.touched         // Touched fields
-form.isValid         // Is form valid
-form.isSubmitting    // Is form submitting
-form.isLoading       // Is loading data
-form.itemData        // Loaded item data
-form.itemId          // Current item ID
-form.listName        // SharePoint list name
-form.listUrl         // SharePoint list URL
-form.userServiceUrl  // SharePoint web URL for user search
-
-// Form methods
-form.setValue(name, value)        // Set field value
-form.getValue(name)               // Get field value
-form.setError(name, error)        // Set field error
-form.handleChange(name, value)    // Handle field change
-form.handleBlur(name)              // Handle field blur
-form.handleSubmit(e)              // Handle form submit
-form.reset()                       // Reset form
-form.resetField(name)              // Reset specific field
-form.validate()                    // Validate form
-form.validateField(name)           // Validate specific field
-form.reloadItemData()              // Reload item data from SharePoint
-```
-
-See `demo/ClassComponentExample.tsx` for complete examples.
 
 ## FormProvider Configuration
 
@@ -847,145 +858,57 @@ See `demo/ClassComponentExample.tsx` for complete examples.
 </FormProvider>
 ```
 
-### With SharePoint List Configuration (Simple - Recommended)
-
-**Chỉ cần truyền endpoint và listName**, FormField sẽ tự động detect field types:
-
-```tsx
-import { sp } from '@pnp/sp';
-import { FormProvider, FormField } from 'spfx-form-handler';
-
-// Initialize SPFx
-sp.setup({
-  spfxContext: context, // Your SPFx context
-});
-
-// Create API service
-const apiService = {
-  getItem: async (listName, itemId, listUrl) => {
-    const web = listUrl ? sp.site.openWeb(listUrl) : sp.web;
-    const item = await web.lists.getByTitle(listName).items.getById(itemId).get();
-    return { success: true, data: item };
-  },
-  addItem: async (listName, data, listUrl) => {
-    const web = listUrl ? sp.site.openWeb(listUrl) : sp.web;
-    const result = await web.lists.getByTitle(listName).items.add(data);
-    return { success: true, data: result.data };
-  },
-  updateItem: async (listName, itemId, data, listUrl) => {
-    const web = listUrl ? sp.site.openWeb(listUrl) : sp.web;
-    await web.lists.getByTitle(listName).items.getById(itemId).update(data);
-    const updated = await web.lists.getByTitle(listName).items.getById(itemId).get();
-    return { success: true, data: updated };
-  },
-  getFieldMetadata: async (listName, fieldName, listUrl) => {
-    const web = listUrl ? sp.site.openWeb(listUrl) : sp.web;
-    const field = await web
-      .lists.getByTitle(listName)
-      .fields
-      .getByInternalNameOrTitle(fieldName)
-      .get();
-    return { success: true, data: field };
-  },
-  getListItems: async (listName, listUrl) => {
-    const web = listUrl ? sp.site.openWeb(listUrl) : sp.web;
-    const items = await web.lists.getByTitle(listName).items.select('Id', 'Title').get();
-    return { success: true, data: items };
-  },
-  uploadFile: async (listName, itemId, file, fileName, listUrl) => {
-    const web = listUrl ? sp.site.openWeb(listUrl) : sp.web;
-    const attachmentFolder = web
-      .lists.getByTitle(listName)
-      .items.getById(itemId)
-      .attachmentFiles;
-    const arrayBuffer = await file.arrayBuffer();
-    const result = await attachmentFolder.add(fileName || file.name, arrayBuffer);
-    return { success: true, data: result.data };
-  },
-};
-
-<FormProvider
-  config={{
-    id: 1, // 0 = new, > 0 = edit
-    listName: 'Projects', // ✅ SharePoint list name
-    listUrl: 'https://hieho.sharepoint.com/sites/apps', // ✅ Web URL hoặc List URL
-    // userServiceUrl: 'https://hieho.sharepoint.com/sites/apps', // Optional: Web URL riêng cho user search (auto-extracted từ listUrl nếu không có)
-    apiService: apiService,
-    autoSave: true, // Auto save to SharePoint
-  }}
->
-  {/* Chỉ cần truyền Internal Field Name từ SharePoint */}
-  <FormField fieldName="Title" />
-  <FormField fieldName="Category" />
-  <FormField fieldName="Status" />
-  <FormField fieldName="StartDate" />
-  <FormField fieldName="AssignedTo" /> {/* FormUserPicker sẽ tự động lấy users từ SharePoint */}
-</FormProvider>
-```
-
-### Advanced Configuration with Field Mapping
-
-For more control, use individual components with field mapping:
+### SharePoint List Configuration
 
 ```tsx
 <FormProvider
   config={{
-    id: 1,
-    listName: 'Projects',
-    listUrl: 'https://hieho.sharepoint.com/sites/apps',
-    fieldMapping: {
-      // Map SharePoint field names to form field names
-      'SPFieldName': 'formFieldName',
-      'AssignedToId': 'assignedTo',
-    },
-    apiService: apiService,
+    id: 0, // 0 = new, > 0 = edit existing
+    listName: 'DemoList',
+    listUrl: 'http://localhost:8080/sites/Developer', // Web URL or List URL
     autoSave: true,
-  }}
->
-  <FormTextField name="title" />
-  <FormLookup name="category" lookupList="Categories" />
-</FormProvider>
-```
-
-### Accessing Item Data
-
-Use `useForm` hook to access the loaded item data:
-
-```tsx
-const form = useForm();
-
-// Access original item data
-console.log(form.itemData);
-
-// Check loading state
-if (form.isLoading) {
-  return <Spinner />;
-}
-
-// Reload item data
-form.reloadItemData();
-```
-
-### Custom Data Transformation Before Save
-
-Use `onBeforeSave` to transform data before saving:
-
-```tsx
-<FormProvider
-  config={{
-    listName: 'Projects',
-    listUrl: 'https://hieho.sharepoint.com/sites/apps', // Web URL hoặc List URL
-    // userServiceUrl: 'https://hieho.sharepoint.com/sites/apps', // Optional: Web URL riêng cho user search
+    validationSchema: {
+      Title: { required: true, minLength: 3 },
+      ItemType: { required: true },
+      StartDate: { required: true },
+      Owner: { required: true },
+    },
     onBeforeSave: (values) => {
       // Transform data before saving
       return {
         ...values,
-        // Add computed fields
+        // Add computed fields, format dates, etc.
+      };
+    },
+    onValidSave: (form) => {
+      // Custom validation before save
+      // Return true to allow save, false to prevent save
+      return form.isValid;
+    },
+    onSaveSuccess: (data) => {
+      alert(`Item ${data.Id ? 'updated' : 'created'} successfully!`);
+    },
+    onSaveError: (error) => {
+      alert(`Error: ${error}`);
+    },
+  }}
+>
+  <MyForm />
+</FormProvider>
+```
+
+### Custom Data Transformation Before Save
+
+```tsx
+<FormProvider
+  config={{
+    listName: 'Projects',
+    listUrl: 'http://localhost:8080/sites/Developer',
+    onBeforeSave: (values) => {
+      return {
+        ...values,
         FullName: `${values.FirstName} ${values.LastName}`,
-        // Format dates
         StartDate: values.StartDate ? new Date(values.StartDate).toISOString() : null,
-        // Transform nested objects
-        Metadata: JSON.stringify(values.CustomData),
       };
     },
   }}
@@ -996,40 +919,23 @@ Use `onBeforeSave` to transform data before saving:
 
 ### Custom Validation Before Save
 
-Use `onValidSave` to add custom validation logic before saving:
-
 ```tsx
 <FormProvider
   config={{
     listName: 'Projects',
-    listUrl: 'https://hieho.sharepoint.com/sites/apps', // Web URL hoặc List URL
-    // userServiceUrl: 'https://hieho.sharepoint.com/sites/apps', // Optional: Web URL riêng cho user search
+    listUrl: 'http://localhost:8080/sites/Developer',
     onValidSave: (form) => {
-      // Custom validation logic
-      // Return true to allow save, false to prevent save
-      
-      // Example: Only allow save if form is valid AND status is not "Draft"
       if (!form.isValid) {
         return false;
       }
       
-      // Example: Check business rules
+      // Check business rules
       if (form.values.Status === 'Draft' && !form.values.Description) {
         form.setError('Description', { message: 'Description is required for draft items', type: 'required' });
         return false;
       }
       
-      // Example: Check date ranges
-      if (form.values.StartDate && form.values.EndDate) {
-        const start = new Date(form.values.StartDate);
-        const end = new Date(form.values.EndDate);
-        if (start > end) {
-          form.setError('EndDate', { message: 'End date must be after start date', type: 'custom' });
-          return false;
-        }
-      }
-      
-      return true; // Allow save
+      return true;
     },
   }}
 >
@@ -1037,46 +943,44 @@ Use `onValidSave` to add custom validation logic before saving:
 </FormProvider>
 ```
 
-## User Service URL Configuration
+## Class Component Support
 
-When using `FormUserPicker`, the library needs a web URL (not list URL) to search for users. The library automatically extracts the web URL from `listUrl` if it's a list URL, or you can provide `userServiceUrl` explicitly:
+The library provides `withForm` HOC to use form context in class components.
 
-### Automatic Extraction
+### Available Form Methods in Class Components
 
-If `listUrl` is a list URL (contains `/Lists/`), the library automatically extracts the web URL:
-
-```tsx
-<FormProvider
-  config={{
-    listName: 'Projects',
-    listUrl: 'https://hieho.sharepoint.com/sites/apps/Lists/Projects', // List URL
-    // userServiceUrl will be automatically extracted to: https://hieho.sharepoint.com/sites/apps
-  }}
->
-  <FormUserPicker name="assignedTo" /> {/* Uses extracted web URL */}
-</FormProvider>
-```
-
-### Explicit userServiceUrl
-
-You can also provide `userServiceUrl` explicitly:
+When using `withForm` HOC, you have access to all form methods:
 
 ```tsx
-<FormProvider
-  config={{
-    listName: 'Projects',
-    listUrl: 'https://hieho.sharepoint.com/sites/apps/Lists/Projects', // List URL for list operations
-    userServiceUrl: 'https://hieho.sharepoint.com/sites/apps', // Web URL for user search
-  }}
->
-  <FormUserPicker name="assignedTo" /> {/* Uses userServiceUrl */}
-</FormProvider>
-```
+const { form } = this.props;
 
-**Note:** 
-- `listUrl` is used for list operations (getItem, addItem, updateItem, etc.)
-- `userServiceUrl` is used for user search operations (FormUserPicker)
-- If `userServiceUrl` is not provided, it's automatically extracted from `listUrl`
+// Form state
+form.values          // Current form values
+form.errors          // Form errors
+form.touched         // Touched fields
+form.dirtyFields     // Dirty fields (changed fields)
+form.isValid         // Is form valid
+form.isSubmitting    // Is form submitting
+form.isLoading       // Is loading data
+form.itemData        // Loaded item data
+form.itemId          // Current item ID
+form.listName        // SharePoint list name
+form.listUrl         // SharePoint list URL
+form.userServiceUrl  // SharePoint web URL for user search
+
+// Form methods
+form.setValue(name, value)        // Set field value
+form.getValue(name)               // Get field value
+form.setError(name, error)        // Set field error
+form.handleChange(name, value)    // Handle field change
+form.handleBlur(name)             // Handle field blur
+form.handleSubmit(e)              // Handle form submit
+form.reset()                      // Reset form
+form.resetField(name)             // Reset specific field
+form.validate()                   // Validate form
+form.validateField(name)          // Validate specific field
+form.reloadItemData()             // Reload item data from SharePoint
+```
 
 ## Multiple Forms
 
@@ -1095,12 +999,10 @@ Each `FormProvider` creates its own isolated React Context, so you can use multi
 ```
 
 Each form maintains its own:
-- State (values, errors, touched)
+- State (values, errors, touched, dirtyFields)
 - List configuration (listName, listUrl, itemId)
 - Validation schema
 - API service
-
-See `demo/MultipleFormsExample.tsx` for a complete example.
 
 ## Development
 
@@ -1124,4 +1026,3 @@ MIT
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
